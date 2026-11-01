@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { FIXTURE, advance, advanceUntil, captureText, expectText, launch, newPage, open, saveReview, startServer } from './helpers.js';
+import { FIXTURE, advance, advanceUntil, captureText, expectText, goTo, launch, newPage, open, saveReview, startServer } from './helpers.js';
 
 /** @type {Awaited<ReturnType<typeof startServer>>} */
 let server;
@@ -65,7 +65,7 @@ test('capture by typing: review, save, show on Today, survive reload', T, async 
   assert.equal(await page.inputValue('dialog[open] select[name="type"]'), 'conference');
   await saveReview(page);
 
-  await page.click('nav a[href="#/today"]');
+  await goTo(page, '#/today');
   const hero = await page.textContent('.hero');
   assert.match(hero, /AWS Summit London/);
   assert.match(hero, /6 pm/);
@@ -87,7 +87,7 @@ test('review blocks bad data and explains why; flagged fields are highlighted', 
   assert.equal(await page.locator('dialog[open]').count(), 1, 'dialog stays open');
   await page.fill('dialog[open] input[name="date"]', '2026-11-12');
   await saveReview(page);
-  await page.click('nav a[href="#/upcoming"]');
+  await goTo(page, '#/upcoming');
   await expectText(page, 'main', /Product Tank meetup/);
   page.assertClean();
 });
@@ -148,7 +148,7 @@ test('import the messy spreadsheet: preview, flag uncertain rows, skip bad ones'
   await page.click('dialog[open] button[value="ok"]');
   await page.waitForSelector('.toast:has-text("Imported 7")');
 
-  await page.click('nav a[href="#/upcoming"]');
+  await goTo(page, '#/upcoming');
   await page.click('button.seg:has-text("All")');
   assert.equal(await page.locator('article.ev').count(), 7);
   await page.fill('#q', 'peer support');
@@ -156,7 +156,7 @@ test('import the messy spreadsheet: preview, flag uncertain rows, skip bad ones'
   assert.match(await page.textContent('article.ev'), /Check details/);
 
   // importing the same file again adds nothing
-  await page.click('nav a[href="#/settings"]');
+  await goTo(page, '#/settings');
   await page.setInputFiles('#import-file', FIXTURE);
   await page.waitForSelector('dialog[open] h2:has-text("Import from")');
   assert.match(await page.textContent('dialog[open]'), /0 events/);
@@ -196,7 +196,7 @@ test('edit, mark attended, mark missed, delete', T, async () => {
   await page.waitForSelector('article.ev[data-status="attended"]');
   assert.equal(await page.locator('.hero-calm').count(), 1, 'no upcoming events left');
 
-  await page.click('nav a[href="#/upcoming"]');
+  await goTo(page, '#/upcoming');
   await page.click('button.seg:has-text("History")');
   await page.click('article.ev summary');
   await page.click('article.ev button:has-text("Delete")');
@@ -225,7 +225,7 @@ test('calendar export contains real alarms', T, async () => {
   await open(page, server.url);
   await captureText(page, 'Cloud meetup on 12 Nov at 7pm at Pax8, Bristol');
   await saveReview(page);
-  await page.click('nav a[href="#/settings"]');
+  await goTo(page, '#/settings');
   const [download] = await Promise.all([page.waitForEvent('download'), page.click('#export-ics')]);
   assert.equal(download.suggestedFilename(), 'showup-events.ics');
   const text = await (await import('node:fs/promises')).readFile(await download.path(), 'utf8');
@@ -243,7 +243,7 @@ test('backup round-trip: export, wipe, restore', T, async () => {
   await open(page, server.url);
   await captureText(page, 'Data Curious on 6 Nov at 5.30pm in Bristol');
   await saveReview(page);
-  await page.click('nav a[href="#/settings"]');
+  await goTo(page, '#/settings');
   const [download] = await Promise.all([page.waitForEvent('download'), page.click('#export-json')]);
   const path = (await import('node:os')).tmpdir() + '/showup-backup-test.json';
   await download.saveAs(path);
@@ -254,7 +254,7 @@ test('backup round-trip: export, wipe, restore', T, async () => {
   await page.waitForSelector('dialog[open] h2:has-text("Restore backup")');
   await page.click('dialog[open] button[value="ok"]');
   await page.waitForSelector('.toast:has-text("Backup restored")');
-  await page.click('nav a[href="#/upcoming"]');
+  await goTo(page, '#/upcoming');
   await expectText(page, 'main', /Data Curious/);
   page.assertClean();
 });
@@ -322,7 +322,7 @@ test('screenshot capture via on-device OCR path (OCR engine stubbed)', T, async 
   const titles = await page.locator('dialog[open] input[name="title"]').evaluateAll((els) => els.map((e) => /** @type {HTMLInputElement} */ (e).value));
   assert.deepEqual(titles, ['Hack Night', 'Cloud Meetup']);
   await saveReview(page);
-  await page.click('nav a[href="#/upcoming"]');
+  await goTo(page, '#/upcoming');
   assert.equal(await page.locator('article.ev').count(), 2);
   page.assertClean();
 });
@@ -343,7 +343,7 @@ test('screenshot capture via AI key path (provider mocked at the network layer)'
   await page.fill('#ai-key', 'sk-ant-test-key');
   await page.click('#ai-save');
   await page.waitForSelector('#ai-status:has-text("saved")');
-  await page.click('nav a[href="#/capture"]');
+  await goTo(page, '#/capture');
   await page.setInputFiles('#shot-file', { name: 'shot.png', mimeType: 'image/png', buffer: PNG_1PX });
   await page.waitForSelector('dialog[open] input[name="title"]');
   assert.equal(seenKey, 'sk-ant-test-key');
@@ -352,7 +352,7 @@ test('screenshot capture via AI key path (provider mocked at the network layer)'
   assert.equal(await page.inputValue('dialog[open] input[name="time"]'), '09:00');
   await saveReview(page);
   // the key is never part of a backup
-  await page.click('nav a[href="#/settings"]');
+  await goTo(page, '#/settings');
   const [download] = await Promise.all([page.waitForEvent('download'), page.click('#export-json')]);
   const backup = await (await import('node:fs/promises')).readFile(await download.path(), 'utf8');
   assert.ok(!backup.includes('sk-ant-test-key'));
@@ -366,7 +366,7 @@ test('a rejected AI key and a non-image are reported, not swallowed', T, async (
   await open(page, server.url, '#/settings');
   await page.fill('#ai-key', 'bad-key');
   await page.click('#ai-save');
-  await page.click('nav a[href="#/capture"]');
+  await goTo(page, '#/capture');
   await page.setInputFiles('#shot-file', { name: 'shot.png', mimeType: 'image/png', buffer: PNG_1PX });
   await page.waitForSelector('.toast-error');
   assert.match(await page.textContent('.toast-error'), /key was rejected/i);
@@ -398,7 +398,7 @@ test('mobile layout: no horizontal overflow on any view, tap targets are large',
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     assert.ok(overflow <= 0, `${href} overflows by ${overflow}px`);
   }
-  await page.click('nav a[href="#/today"]');
+  await goTo(page, '#/today');
   const small = await page.evaluate(() =>
     [...document.querySelectorAll('nav a, #add-btn, article.ev .btn')].map((e) => e.getBoundingClientRect()).filter((r) => r.height < 34).length);
   assert.equal(small, 0);
@@ -426,7 +426,7 @@ test('stays responsive with 2,000 events', T, async () => {
   const t0 = Date.now();
   await page.reload();
   await page.waitForSelector('html[data-ready="true"]');
-  await page.click('nav a[href="#/upcoming"]');
+  await goTo(page, '#/upcoming');
   await page.waitForSelector('article.ev');
   const loadMs = Date.now() - t0;
   await page.fill('#q', 'Bulk event 1999');

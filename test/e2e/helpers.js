@@ -123,3 +123,16 @@ export async function expectText(page, selector, re, timeout = 5000) {
     { timeout },
   );
 }
+
+const ROUTE_TITLES = /** @type {Record<string,string>} */ ({ '#/today': 'Today', '#/upcoming': 'Upcoming', '#/capture': 'Capture', '#/settings': 'Settings' });
+
+/**
+ * Click a main-nav link and wait until that view has actually rendered
+ * (its <h1> shows), so later assertions never read the previous view.
+ * @param {import('playwright').Page} page
+ * @param {string} hash e.g. "#/upcoming"
+ */
+export async function goTo(page, hash) {
+  await page.click(`nav a[href="${hash}"]`);
+  await expectText(page, 'main h1', new RegExp(`^${ROUTE_TITLES[hash]}$`));
+}
