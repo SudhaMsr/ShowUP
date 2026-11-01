@@ -52,6 +52,35 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  verify-live:
+    # Runs the full browser suite against the real published URL.
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          npm install -g playwright
+          npx playwright install --with-deps chromium
+      - name: Wait for the site to serve this build
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "${{ needs.deploy.outputs.page_url }}")
+            [ "$code" = "200" ] && exit 0
+            sleep 5
+          done
+          echo "site did not return 200"; exit 1
+      - name: Browser tests against the live site
+        env:
+          BASE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          export NODE_PATH="$(npm root -g)"
+          npm run test:e2e
