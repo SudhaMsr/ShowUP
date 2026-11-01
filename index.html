@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://api.anthropic.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com; worker-src 'self' blob: https://cdn.jsdelivr.net; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#16181d">
+  <meta name="description" content="ShowUp keeps every event you registered for in one place. Capture by voice, screenshot or text, and get reminded before it starts.">
+  <title>ShowUp</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles/app.css">
+</head>
+<body>
+  <a class="skip" href="#view">Skip to content</a>
+  <header class="top">
+    <div class="top-inner">
+      <a class="brand" href="#/today" aria-label="ShowUp, go to Today">
+        <svg class="brand-mark" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" focusable="false">
+          <rect width="32" height="32" rx="8" fill="currentColor"/>
+          <path d="M9 17.5l4.5 4.5L23 11" fill="none" stroke="var(--accent)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="brand-name">ShowUp</span>
+      </a>
+      <nav aria-label="Main">
+        <a href="#/today">Today</a>
+        <a href="#/upcoming">Upcoming</a>
+        <a href="#/capture">Capture</a>
+        <a href="#/settings">Settings</a>
+      </nav>
+      <button id="add-btn" class="btn btn-primary btn-add" type="button" aria-label="Add event">
+        <span aria-hidden="true">+</span><span class="add-label"> Add</span>
+      </button>
+    </div>
+  </header>
+  <div id="catchup"></div>
+  <main id="view" tabindex="-1">
+    <p class="muted loading" role="status">Loading…</p>
+  </main>
+  <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
+  <noscript><p class="banner banner-warn">ShowUp needs JavaScript to run.</p></noscript>
+  <script type="module" src="src/app/main.js"></script>
+</body>
+</html>
