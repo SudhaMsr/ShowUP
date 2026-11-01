@@ -607,3 +607,5 @@ nav a { position: relative; } nav a.active { animation: pop .35s both; }
 [data-type][data-type="submission"] { --tc: #e0a100; }
 [data-type][data-type="personal"] { --tc: #8b5cf6; }
 [data-type][data-type="other"] { --tc: #64748b; }
+details.adv > summary { cursor: pointer; font-weight: 700; color: var(--ink-2); }
+details.adv[open] > summary { margin-bottom: 12px; }

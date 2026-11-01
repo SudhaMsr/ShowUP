@@ -340,6 +340,7 @@ test('screenshot capture via AI key path (provider mocked at the network layer)'
     });
   });
   await open(page, server.url, '#/settings');
+  await page.click('details.adv > summary');
   await page.fill('#ai-key', 'sk-ant-test-key');
   await page.click('#ai-save');
   await page.waitForSelector('#ai-status:has-text("saved")');
@@ -364,6 +365,7 @@ test('a rejected AI key and a non-image are reported, not swallowed', T, async (
   await page.route('https://api.anthropic.com/v1/messages', (route) =>
     route.fulfill({ status: 401, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' }));
   await open(page, server.url, '#/settings');
+  await page.click('details.adv > summary');
   await page.fill('#ai-key', 'bad-key');
   await page.click('#ai-save');
   await goTo(page, '#/capture');

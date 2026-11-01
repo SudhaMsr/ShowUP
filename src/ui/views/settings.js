@@ -107,12 +107,13 @@ export function renderSettings(ctx) {
         h('button', { class: 'btn', type: 'button', id: 'export-json', onclick: () => download('showup-backup.json', toBackupJSON(store.getState().events), 'application/json') }, 'Backup (.json)'),
         h('button', { class: 'btn', type: 'button', id: 'export-csv', onclick: () => download('showup-events.csv', toEventsCSV(store.getState().events), 'text/csv;charset=utf-8') }, 'Export (.csv)')),
       importPanel(ctx), wipe),
-    h('section', { class: 'panel', 'aria-labelledby': 's-ai' },
-      h('h2', { id: 's-ai' }, 'Better screenshot reading (optional)'),
-      h('p', { class: 'muted' }, 'By default screenshots are read on your device. For higher accuracy you can add your own Anthropic API key. It is stored only in this browser and sent only to api.anthropic.com. Usage is billed to your own account.'),
-      h('div', { class: 'row' }, keyInput, saveKey, clearKey),
-      keyStatus),
     h('section', { class: 'panel', 'aria-labelledby': 's-about' },
       h('h2', { id: 's-about' }, 'Privacy'),
-      h('p', { class: 'muted' }, 'No tracking and no server. Your sign-in lives only on this device. Your events never leave this browser unless you export them or use your own AI key for a screenshot.')));
+      h('p', { class: 'muted' }, 'No tracking and no server. Your sign-in lives only on this device. Your events never leave this browser unless you export them or use your own AI key for a screenshot.')),
+    h('details', { class: 'panel adv' },
+      h('summary', {}, 'Advanced: AI screenshot reading (optional, not needed for Excel)'),
+      h('div', { class: 'stack' },
+        h('p', { class: 'muted' }, 'Only for the Screenshot option on Capture. Excel, CSV, voice and typing never use this. By default screenshots are read on your device; add your own Anthropic API key for higher accuracy. It stays in this browser (encrypted) and goes only to api.anthropic.com. Usage is billed to your own account.'),
+        h('div', { class: 'row' }, keyInput, saveKey, clearKey),
+        keyStatus)));
 }
