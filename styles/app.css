@@ -609,3 +609,16 @@ nav a { position: relative; } nav a.active { animation: pop .35s both; }
 [data-type][data-type="other"] { --tc: #64748b; }
 details.adv > summary { cursor: pointer; font-weight: 700; color: var(--ink-2); }
 details.adv[open] > summary { margin-bottom: 12px; }
+
+/* ===== Approvals ===== */
+.badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 4px; border-radius: 999px; background: var(--grad); color: #fff; font-size: .72rem; font-weight: 800; animation: pop .35s both; }
+.badge[hidden] { display: none; }
+.sg { --tc: var(--violet); display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; background: var(--card); border: 1.5px solid color-mix(in srgb, var(--tc) 35%, var(--line)); border-left: 6px solid var(--tc); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); animation: rise .4s both; }
+.sg-main { display: grid; gap: 3px; min-width: 0; }
+.sg-src { font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--tc); }
+.sg-title { font-size: 1.1rem; overflow-wrap: anywhere; }
+.sg-when { color: var(--ink-2); font-weight: 600; font-size: .92rem; }
+.sg-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.chip-review { background: #ffe6a8; color: #5c3a00; }
+ol.steps { padding-left: 20px; display: grid; gap: 6px; margin: 8px 0; }
+@media (max-width: 560px) { .sg { grid-template-columns: 1fr; } .sg-actions { justify-content: flex-start; } }

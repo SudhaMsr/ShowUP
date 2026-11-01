@@ -5,6 +5,7 @@ import { notificationState, requestNotificationPermission, showSystemNotificatio
 import { confirmDialog, download, h, toast } from '../dom.js';
 import { importPanel } from '../import-panel.js';
 import { accountPanel } from '../account-panel.js';
+import { connectionsPanel } from '../connections-panel.js';
 import { offsetsEditor } from '../offsets-editor.js';
 
 /** @typedef {import('./today.js').ViewCtx} ViewCtx */
@@ -92,6 +93,7 @@ export function renderSettings(ctx) {
   return h('div', { class: 'stack-lg' },
     persistent ? null : h('p', { class: 'banner banner-warn', role: 'alert' }, 'Your browser is blocking storage, so events will be lost when you close this tab. Check private-browsing or site-data settings.'),
     accountPanel(ctx),
+    connectionsPanel(ctx),
     h('section', { class: 'panel', 'aria-labelledby': 's-rem' },
       h('h2', { id: 's-rem' }, 'Reminders'),
       h('p', { class: 'muted' }, 'Tap the times you want a nudge before every event. Add your own too.'),

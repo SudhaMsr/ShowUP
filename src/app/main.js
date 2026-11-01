@@ -3,6 +3,10 @@ import { toICS } from '../domain/ics.js';
 import { describeOffset } from '../domain/reminders.js';
 import { openRepository } from '../storage/repository.js';
 import { createStore } from './store.js';
+import { createInbox } from './inbox.js';
+import { createGoogle } from './google.js';
+import { createConnections } from './connections.js';
+import { renderInbox } from '../ui/views/inbox.js';
 import { createAuth } from './auth.js';
 import { authSupported, deleteDatabases, idbAuthStorage } from './auth-storage.js';
 import { makeCodec } from './crypto.js';
@@ -31,6 +35,7 @@ const ROUTES = /** @type {Record<string, { title: string, render: (ctx: any) => 
   '#/calendar': { title: 'Calendar', render: renderCalendar },
   '#/board': { title: 'Board', render: renderBoard },
   '#/insights': { title: 'Insights', render: renderInsights },
+  '#/inbox': { title: 'Approvals', render: renderInbox },
   '#/capture': { title: 'Capture', render: renderCapture },
   '#/settings': { title: 'Settings', render: renderSettings },
 });
@@ -76,6 +81,8 @@ async function start() {
 async function run(repo, account) {
   const store = createStore(repo);
   await store.init();
+  const inbox = createInbox(repo);
+  await inbox.init();
 
   const view = byId('view');
   const catchup = byId('catchup');
@@ -101,8 +108,21 @@ async function run(repo, account) {
     },
   };
 
+  /** New proposals found in a connected account: say so in the app, and in a system notification if the app is in the background. @param {import('../domain/suggestions.js').Suggestion[]} added */
+  const onFound = (added) => {
+    const n = added.length;
+    const title = `${n} new event${n === 1 ? '' : 's'} to approve`;
+    toast(`${title}. Open Approvals to add ${n === 1 ? 'it' : 'them'}.`, { ms: 9000 });
+    if (document.visibilityState !== 'visible') {
+      void showSystemNotification({ title, body: added.slice(0, 3).map((s) => s.draft.title).join(' · '), tag: 'showup-inbox', data: { inbox: true } });
+    }
+  };
+  const connections = createConnections({ repo, store, inbox, google: createGoogle(), onFound });
+
   const ctx = {
     store,
+    inbox,
+    connections,
     account,
     actions,
     repaint: () => paint(),
@@ -148,6 +168,20 @@ async function run(repo, account) {
   document.addEventListener('close', () => paint(), true);
   window.addEventListener('hashchange', () => paint(true));
   byId('add-btn').addEventListener('click', () => ctx.add());
+
+  // ---- Approvals badge ----
+  const badge = byId('inbox-badge');
+  const updateBadge = () => {
+    const n = inbox.count();
+    badge.hidden = n === 0;
+    badge.textContent = String(n);
+    byId('inbox-link').setAttribute('aria-label', n ? `Approvals, ${n} waiting` : 'Approvals');
+  };
+  inbox.subscribe(() => {
+    updateBadge();
+    if (currentRoute() === '#/inbox' && !document.querySelector('dialog[open]')) paint();
+  });
+  updateBadge();
   paint();
 
   // ---- "How did it go?" prompts ----
@@ -263,6 +297,7 @@ async function run(repo, account) {
     }
   });
   navigator.serviceWorker?.addEventListener('message', (ev) => {
+    if (ev.data?.type === 'open-inbox') location.hash = '#/inbox';
     if (ev.data?.type === 'pending-outcomes') applyPending();
   });
   // Keep countdowns fresh without disturbing editing.
@@ -279,13 +314,15 @@ async function run(repo, account) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
+  connections.startAuto();
+
   // ---- Command palette and theme ----
   byId('theme-btn').addEventListener('click', () => toggleTheme());
   const openPalette = installPalette(() => {
     const go = (/** @type {string} */ r, /** @type {string} */ label) => ({ id: `go${r}`, label: `Go to ${label}`, hint: 'Navigate', run: () => ctx.goto(r) });
     const cmds = [
       { id: 'add', label: 'Add event', hint: 'Create', run: () => ctx.add() },
-      go('#/today', 'Today'), go('#/upcoming', 'Upcoming'), go('#/calendar', 'Calendar'), go('#/board', 'Board'), go('#/insights', 'Insights'), go('#/capture', 'Capture & upload'), go('#/settings', 'Settings'),
+      go('#/today', 'Today'), go('#/upcoming', 'Upcoming'), go('#/calendar', 'Calendar'), go('#/board', 'Board'), go('#/inbox', 'Approvals'), go('#/insights', 'Insights'), go('#/capture', 'Capture & upload'), go('#/settings', 'Settings'),
       { id: 'theme', label: 'Toggle light / dark theme', hint: 'Appearance', run: () => toggleTheme() },
     ];
     if (account) cmds.push({ id: 'lock', label: 'Lock ShowUp', hint: 'Security', run: () => account.lock() });

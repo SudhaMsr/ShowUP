@@ -63,6 +63,7 @@ self.addEventListener('notificationclick', (event) => {
   n.close();
   const eventId = n.data && typeof n.data.eventId === 'string' ? n.data.eventId : null;
   const isFollowUp = Boolean(n.data && n.data.followUp);
+  const isInbox = Boolean(n.data && n.data.inbox);
   const action = OUTCOMES.includes(event.action) ? event.action : null;
 
   event.waitUntil(
@@ -72,6 +73,17 @@ self.addEventListener('notificationclick', (event) => {
       if (eventId && isFollowUp && action) {
         await leaveNote(eventId, action);
         for (const w of windows) w.postMessage({ type: 'pending-outcomes' });
+        return;
+      }
+      // New events to approve: bring the app forward on the Approvals page.
+      if (isInbox) {
+        const w = windows.find((c) => 'focus' in c);
+        if (w) {
+          await w.focus();
+          w.postMessage({ type: 'open-inbox' });
+        } else {
+          await self.clients.openWindow('./#/inbox');
+        }
         return;
       }
       // Body tapped on a follow-up: bring the app forward and ask there.

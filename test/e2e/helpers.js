@@ -157,7 +157,7 @@ export async function expectText(page, selector, re, timeout = 5000) {
   );
 }
 
-const ROUTE_TITLES = /** @type {Record<string,string>} */ ({ '#/today': 'Today', '#/upcoming': 'Upcoming', '#/capture': 'Capture', '#/settings': 'Settings', '#/calendar': 'Calendar', '#/board': 'Board', '#/insights': 'Insights' });
+const ROUTE_TITLES = /** @type {Record<string,string>} */ ({ '#/today': 'Today', '#/upcoming': 'Upcoming', '#/capture': 'Capture', '#/settings': 'Settings', '#/calendar': 'Calendar', '#/board': 'Board', '#/insights': 'Insights', '#/inbox': 'Approvals' });
 
 /**
  * Click a main-nav link and wait until that view has actually rendered

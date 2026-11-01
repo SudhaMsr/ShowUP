@@ -37,7 +37,7 @@ test('boots cleanly, routes work, one h1 per view, landmarks present', T, async 
 test('every interactive control has an accessible name (all views)', T, async () => {
   const page = await newPage(browser, { now: '2026-11-05T09:00:00' });
   await open(page, server.url);
-  for (const href of ['#/today', '#/upcoming', '#/calendar', '#/board', '#/insights', '#/capture', '#/settings']) {
+  for (const href of ['#/today', '#/upcoming', '#/calendar', '#/board', '#/inbox', '#/insights', '#/capture', '#/settings']) {
     await page.click(`nav a[href="${href}"]`);
     const unnamed = await page.evaluate(() =>
       [...document.querySelectorAll('button, a[href], input, select, textarea, summary')]
@@ -340,7 +340,7 @@ test('screenshot capture via AI key path (provider mocked at the network layer)'
     });
   });
   await open(page, server.url, '#/settings');
-  await page.click('details.adv > summary');
+  await page.click('details.adv:has(#ai-key) > summary');
   await page.fill('#ai-key', 'sk-ant-test-key');
   await page.click('#ai-save');
   await page.waitForSelector('#ai-status:has-text("saved")');
@@ -365,7 +365,7 @@ test('a rejected AI key and a non-image are reported, not swallowed', T, async (
   await page.route('https://api.anthropic.com/v1/messages', (route) =>
     route.fulfill({ status: 401, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' }));
   await open(page, server.url, '#/settings');
-  await page.click('details.adv > summary');
+  await page.click('details.adv:has(#ai-key) > summary');
   await page.fill('#ai-key', 'bad-key');
   await page.click('#ai-save');
   await goTo(page, '#/capture');
@@ -395,7 +395,7 @@ test('mobile layout: no horizontal overflow on any view, tap targets are large',
   await open(page, server.url);
   await captureText(page, 'A fairly long conference title that should wrap nicely on a small phone screen on 6 Nov at 9am at The Very Long Venue Name, Somewhere Far Away');
   await saveReview(page);
-  for (const href of ['#/today', '#/upcoming', '#/calendar', '#/board', '#/insights', '#/capture', '#/settings']) {
+  for (const href of ['#/today', '#/upcoming', '#/calendar', '#/board', '#/inbox', '#/insights', '#/capture', '#/settings']) {
     await page.click(`nav a[href="${href}"]`);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     assert.ok(overflow <= 0, `${href} overflows by ${overflow}px`);

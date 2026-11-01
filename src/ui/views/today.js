@@ -7,7 +7,7 @@ import { dayLabel, mapsUrl, time12 } from '../format.js';
 
 /**
  * @typedef {import('../event-card.js').CardActions} CardActions
- * @typedef {{ store: import('../../app/store.js').Store, now: Date, actions: CardActions, add: () => void, goto: (route: string) => void, repaint?: () => void, account?: import('../account-panel.js').Account | null }} ViewCtx
+ * @typedef {{ store: import('../../app/store.js').Store, now: Date, actions: CardActions, add: () => void, goto: (route: string) => void, repaint?: () => void, inbox?: ReturnType<typeof import('../../app/inbox.js').createInbox>, connections?: import('../../app/connections.js').Connections, account?: import('../account-panel.js').Account | null }} ViewCtx
  */
 
 /** @param {ViewCtx} ctx */

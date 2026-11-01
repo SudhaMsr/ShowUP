@@ -280,3 +280,108 @@ test('command palette (Ctrl+K) jumps to a view and finds events; theme toggle pe
   assert.equal(await page.getAttribute('html', 'data-theme'), t);
   page.assertClean(IGNORE);
 });
+
+// ---------- Google connection (Google itself is stubbed at the network layer) ----------
+const GIS_STUB = `window.google={accounts:{oauth2:{initTokenClient:function(cfg){return{requestAccessToken:function(){cfg.callback({access_token:'test-token',expires_in:3600});}};},revoke:function(t,cb){cb();}}}};`;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const inDays = (n) => { const d = new Date(Date.now() + n * 864e5); d.setHours(12, 0, 0, 0); return d; };
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+async function stubGoogle(page, { calls = [] } = {}) {
+  const mailDay = inDays(9);
+  const mailBody = Buffer.from(`When: ${mailDay.getDate()} ${MONTHS[mailDay.getMonth()]} ${mailDay.getFullYear()} at 6pm\nWhere: Science Park`).toString('base64url');
+  await page.route('https://accounts.google.com/gsi/client', (r) => r.fulfill({ contentType: 'text/javascript', body: GIS_STUB }));
+  await page.route('https://www.googleapis.com/**', (r) => {
+    const url = r.request().url();
+    calls.push(url);
+    const json = (body) => r.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
+    if (url.includes('/calendar/v3/')) {
+      return json({ items: [
+        { id: 'c1', summary: 'Cloud Meetup', location: 'Watershed', start: { dateTime: `${ymd(inDays(3))}T18:00:00` }, end: { dateTime: `${ymd(inDays(3))}T20:00:00` } },
+        { id: 'c2', summary: 'Hack Weekend hackathon', start: { date: ymd(inDays(5)) } },
+        { id: 'c3', status: 'cancelled', summary: 'Gone', start: { date: ymd(inDays(6)) } },
+      ] });
+    }
+    if (/\/messages\?/.test(url)) return json({ messages: [{ id: 'm1' }] });
+    return json({ payload: { mimeType: 'text/plain', headers: [{ name: 'Subject', value: 'You are registered: Founders meetup' }, { name: 'From', value: 'Luma <hi@lu.ma>' }], body: { data: mailBody } } });
+  });
+}
+
+test('google: connect, proposals wait in Approvals with a badge, approve adds, dismiss is permanent', T, async () => {
+  const calls = [];
+  const page = await newPage(browser);
+  await stubGoogle(page, { calls });
+  await open(page, server.url, '#/settings');
+  await page.waitForSelector('#connections-panel');
+
+  // a bad Client ID is rejected before anything is sent to Google
+  await page.fill('#g-client', 'not-a-client-id');
+  await page.click('#g-connect');
+  await page.waitForSelector('.toast:has-text("does not look like a Google Client ID")');
+  assert.equal(calls.length, 0);
+
+  await page.fill('#g-client', '123456-abc.apps.googleusercontent.com');
+  await page.check('#g-gmail');
+  await page.click('#g-connect');
+  await expectText(page, '#inbox-badge', /^3$/);
+  assert.match(await page.textContent('#g-status'), /Connected/);
+  assert.equal(calls.filter((u) => u.includes('/calendar/')).length >= 1, true);
+  assert.equal(await page.locator('#inbox-badge').isVisible(), true);
+
+  // nothing has been added to the real events yet
+  await page.click('nav a[href="#/upcoming"]');
+  await page.waitForSelector('text=No events here yet');
+
+  await page.click('nav a[href="#/inbox"]');
+  await page.waitForSelector('.sg');
+  assert.equal(await page.locator('.sg').count(), 3);
+  assert.match(await page.textContent('main'), /Cloud Meetup/);
+  assert.match(await page.textContent('main'), /Founders meetup/);
+  assert.doesNotMatch(await page.textContent('main'), /Gone/, 'cancelled events are not proposed');
+
+  // approve one: it becomes a real event
+  await page.click('.sg:has-text("Cloud Meetup") .sg-approve');
+  await expectText(page, '#inbox-badge', /^2$/);
+  await page.click('nav a[href="#/upcoming"]');
+  await page.waitForSelector('article.ev:has-text("Cloud Meetup")');
+
+  // dismiss one: gone, and a re-check does not bring it back
+  await page.click('nav a[href="#/inbox"]');
+  await page.click('.sg:has-text("Hack Weekend") .sg-dismiss');
+  await expectText(page, '#inbox-badge', /^1$/);
+  await page.evaluate(() => (location.hash = '#/settings'));
+  await page.click('#g-sync');
+  await page.waitForSelector('.toast:has-text("Nothing new")');
+  assert.equal(await page.textContent('#inbox-badge'), '1');
+
+  // approve all
+  await page.click('nav a[href="#/inbox"]');
+  await page.click('#approve-all');
+  await page.waitForSelector('text=Nothing waiting for approval');
+  assert.equal(await page.locator('#inbox-badge').isVisible(), false);
+
+  // disconnect
+  await page.evaluate(() => (location.hash = '#/settings'));
+  await page.click('#g-disconnect');
+  await expectText(page, '#g-status', /Not connected/);
+  page.assertClean(IGNORE);
+});
+
+test('google: proposals survive a reload (they are stored encrypted) and the connection is remembered', T, async () => {
+  const page = await newPage(browser);
+  await stubGoogle(page);
+  await open(page, server.url, '#/settings');
+  await page.fill('#g-client', '123456-abc.apps.googleusercontent.com');
+  await page.click('#g-connect');
+  await expectText(page, '#inbox-badge', /^2$/);
+  await page.reload();
+  await page.waitForSelector('html[data-ready="true"]');
+  await expectText(page, '#inbox-badge', /^2$/);
+  const raw = await page.evaluate(() => new Promise((resolve) => {
+    const req = indexedDB.open('showup');
+    req.onsuccess = () => { const all = req.result.transaction('meta').objectStore('meta').getAll(); all.onsuccess = () => resolve(JSON.stringify(all.result)); };
+  }));
+  assert.ok(!raw.includes('Cloud Meetup'), 'proposals are not stored in the clear');
+  assert.ok(!raw.includes('123456-abc'), 'client id is not stored in the clear');
+  page.assertClean(IGNORE);
+});

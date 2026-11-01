@@ -6,7 +6,7 @@ export const EVENT_TYPES = /** @type {const} */ ([
   'meeting', 'networking', 'submission', 'personal', 'other',
 ]);
 export const STATUSES = /** @type {const} */ (['upcoming', 'attended', 'missed', 'cancelled']);
-export const SOURCES = /** @type {const} */ (['manual', 'voice', 'screenshot', 'import', 'text']);
+export const SOURCES = /** @type {const} */ (['manual', 'voice', 'screenshot', 'import', 'text', 'calendar', 'email']);
 
 /** @typedef {typeof EVENT_TYPES[number]} EventType */
 /** @typedef {typeof STATUSES[number]} EventStatus */

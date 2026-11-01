@@ -20,11 +20,20 @@ It runs entirely in your browser. There is no server. You sign in with a name an
 | Weekly insights | An interactive week-by-week chart (4, 8 or 12 weeks), an animated success-rate ring, streak, and a per-type breakdown. Success rate is attended ÷ (attended + missed); cancelled events never count against you. |
 | Board, Calendar, Palette | A drag-and-drop **Board** (Upcoming / Attended / Missed / Cancelled), a month **Calendar** with day details, a **Ctrl/⌘ K command palette**, light/dark theme, and Duplicate on any event. |
 | Upload everything | Choose several files at once: Excel (every sheet), CSV, calendar `.ics` and ShowUp backups. Each file gets its own result, duplicates across files collapse, and one bad file never blocks the rest. |
+| Connect Google | Link your Google Calendar (and optionally Gmail registration emails). ShowUp proposes what it finds in **Approvals**, tells you with a badge and a notification, and adds an event only when you approve. Read-only; it never writes to Google. |
 | Sign-in and privacy | A device account (name + password). Events and settings are encrypted at rest with AES-GCM; the key is wrapped by your password (PBKDF2-SHA256, 310k rounds). Lockout back-off, optional "keep me signed in" for 30 days, idle auto-lock. Optional AI screenshot reading uses your own API key. |
 
 ## Sign-in: what it is and is not
 
 The login protects the data on **this device**. There is no server, so there is no "reset by email": if you forget the password, the only way back in is to erase the device and restore from a backup file or re-upload your spreadsheet. Export a backup now and then (**Settings → Backup**). It is not a cloud account, and it does not sync between devices.
+
+## Connecting Google: what it needs and what it cannot do
+
+* You create your own free **Google Client ID** (the Settings page walks you through it). ShowUp has no server, so there is nowhere safe to keep a shared secret, and this keeps your calendar between you and Google.
+* ShowUp checks every 20 minutes **while it is open**. It cannot check while the app is closed, because that needs a server. When you come back it checks straight away.
+* Google access lasts about an hour and is renewed quietly when possible. While your Google project is in "Testing", Google asks you to sign in again roughly weekly; ShowUp then shows a **Reconnect** button.
+* Gmail is optional and read-only. ShowUp only looks at recent mail that mentions registration, tickets, invitations or similar, and treats every match as a suggestion for you to approve, not a fact.
+* Tokens stay in memory. The Client ID and everything found wait in the encrypted store.
 
 ## Reminders: what to expect
 

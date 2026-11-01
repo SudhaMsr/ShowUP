@@ -92,6 +92,14 @@ See [SCHEMA.md](SCHEMA.md). Dates are **civil local date + optional civil time**
 * Honest limits: this protects data at rest against someone reading browser storage. It cannot protect against malware or a hostile browser extension on an unlocked device, and a forgotten password is unrecoverable. Data saved before sign-in existed is encrypted automatically on first unlock (`migrate()`).
 * The notification service worker only ever stores `{event id, outcome}` in a separate `showup-pending` database. Titles and places are never written outside the encrypted store.
 
+### 6.2 Google connection and the Approvals inbox
+
+* `src/app/google.js` uses Google Identity Services' browser **token client** with a user-supplied Client ID, scopes `calendar.readonly` and (optionally) `gmail.readonly`. Access tokens (about 1 h) are held only in memory; a silent renewal is attempted, otherwise the UI shows Reconnect.
+* `src/domain/suggestions.js` (pure, unit-tested) maps Calendar items and emails to *proposals*. Cancelled and declined events are skipped. For email, a labelled "When/Date:" line beats the first date in the body, past dates are ignored, and anything uncertain keeps the "check details" flag.
+* `src/app/inbox.js` holds proposals in the encrypted `meta` store (`suggestions`, `dismissed`). Approving calls `store.save`; dismissing is remembered so an item never returns. Items already in your events (by title, date and time) are never proposed.
+* CSP is widened only to `accounts.google.com` (script, frame, connect) and `www.googleapis.com` (connect).
+* Limit: no server means no background sync. Polling runs while the app is open (every 20 min and on return to the tab). Notifications for new proposals follow the same rule as reminders.
+
 ## 7. Performance and scale
 
 * Rendering is O(n) per view over in-memory events; a 10k-event dataset is validated in tests. IndexedDB access is indexed by `date`.
@@ -118,6 +126,7 @@ Browser tests use Playwright driving real Chrome rather than Selenium. Both auto
 * **ADR-004 Closed-app reminders via ICS alarms; push relay deferred.** A relay needs a server and VAPID keys. It can be added behind the same `reminderSchedule` function.
 * **ADR-006 Device-bound encryption instead of a cloud login.** A server-backed login would need a backend, a user database and breach responsibility, and would send event data off the device. A password-wrapped data key gives real protection at rest with none of that. Trade-off: no recovery and no sync.
 * **ADR-007 Motion without animation libraries.** Native Web Animations/CSS, View-free entrance transitions, a hand-written WebGL fragment shader for the sign-in backdrop, SVG for the success ring, canvas for confetti. All honour `prefers-reduced-motion`. GSAP, Framer Motion, Three.js and Spline were not used: Framer Motion is React-only, and the others would add a runtime dependency (and a CDN) to an app whose design goal is zero dependencies.
+* **ADR-008 Bring-your-own Google Client ID, read-only, approval-first.** A shared client would need a verified OAuth app and a backend for refresh tokens. A personal client works entirely in the browser. Nothing from Google is added without an explicit approval, because email parsing is a guess.
 * **ADR-005 AI is optional and BYO-key.** Free, private default (rules + on-device OCR); better accuracy if the user opts in.
 
 ## 10. Known limitations

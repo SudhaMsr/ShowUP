@@ -41,6 +41,13 @@ When signed in, rows in `events` and `meta` are stored as `{ id | key, enc: 1, i
 
 Written by the service worker when you press a notification action: `{ id, status }` only, applied and cleared by the page on its next start.
 
+## Meta keys added for Google and Approvals
+
+* `google`: `{ clientId, gmail, connected, lastSync, lastAdded, errors[], needsReconnect }` (encrypted).
+* `suggestions`: array of `{ id, source: 'calendar'|'email', label, ref, foundAt, draft }` waiting for approval (encrypted, max 200).
+* `dismissed`: array of suggestion ids never to propose again (max 3000).
+* Events gain `source` values `calendar` and `email` when approved from Approvals.
+
 ## Settings object
 
 ```json
