@@ -88,7 +88,7 @@ test('review blocks bad data and explains why; flagged fields are highlighted', 
   await page.fill('dialog[open] input[name="date"]', '2026-11-12');
   await saveReview(page);
   await page.click('nav a[href="#/upcoming"]');
-  assert.match(await page.textContent('main'), /Product Tank meetup/);
+  await expectText(page, 'main', /Product Tank meetup/);
   page.assertClean();
 });
 
@@ -255,7 +255,7 @@ test('backup round-trip: export, wipe, restore', T, async () => {
   await page.click('dialog[open] button[value="ok"]');
   await page.waitForSelector('.toast:has-text("Backup restored")');
   await page.click('nav a[href="#/upcoming"]');
-  assert.match(await page.textContent('main'), /Data Curious/);
+  await expectText(page, 'main', /Data Curious/);
   page.assertClean();
 });
 
