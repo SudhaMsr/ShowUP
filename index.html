@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="styles/app.css">
 </head>
 <body>
+  <div id="auth-root" class="auth-root" hidden></div>
   <a class="skip" href="#view">Skip to content</a>
   <header class="top">
     <div class="top-inner">
@@ -28,9 +29,17 @@
       <nav aria-label="Main">
         <a href="#/today">Today</a>
         <a href="#/upcoming">Upcoming</a>
+        <a href="#/calendar">Calendar</a>
+        <a href="#/board">Board</a>
+        <a href="#/insights">Insights</a>
         <a href="#/capture">Capture</a>
         <a href="#/settings">Settings</a>
       </nav>
+      <button id="palette-btn" class="btn btn-icon" type="button" aria-label="Open command palette (Ctrl or Command K)" title="Command palette (Ctrl/⌘ K)"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      <button id="theme-btn" class="btn btn-icon" type="button" aria-label="Toggle light or dark theme" title="Toggle theme"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
+      <button id="lock-btn" class="btn btn-lock" type="button" hidden aria-label="Lock ShowUp" title="Lock ShowUp">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg><span class="add-label">Lock <span id="who" class="who"></span></span>
+      </button>
       <button id="add-btn" class="btn btn-primary btn-add" type="button" aria-label="Add event">
         <span aria-hidden="true">+</span><span class="add-label"> Add</span>
       </button>

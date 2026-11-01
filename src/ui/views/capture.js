@@ -6,6 +6,7 @@ import { checkImage } from '../../capture/image.js';
 import { ocrDrafts, visionDrafts } from '../../capture/screenshot.js';
 import { h, toast } from '../dom.js';
 import { openEditor, openReview } from '../dialogs.js';
+import { importPanel } from '../import-panel.js';
 
 /** @typedef {import('./today.js').ViewCtx} ViewCtx */
 
@@ -163,6 +164,10 @@ export function renderCapture(ctx) {
     h('section', { class: 'panel', 'aria-labelledby': 'cap-shot' },
       h('h2', { id: 'cap-shot' }, 'Show it'),
       drop, fileInput, shotStatus),
+    h('section', { class: 'panel', 'aria-labelledby': 'cap-files' },
+      h('h2', { id: 'cap-files' }, 'Upload your files'),
+      h('p', { class: 'muted' }, 'Already keep your events in Excel, a CSV or a calendar? Drop all your files in at once.'),
+      importPanel(ctx)),
     h('section', { class: 'panel', 'aria-labelledby': 'cap-type' },
       h('h2', { id: 'cap-type' }, 'Type or paste it'),
       area,

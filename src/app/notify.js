@@ -25,16 +25,29 @@ export async function requestNotificationPermission() {
 /**
  * Show a system notification if permitted. Never throws: a notification failure
  * must not break reminder handling.
- * @param {{ title: string, body?: string, tag?: string }} n
+ * Action buttons (and the data they carry back) only work through the service
+ * worker, so they are dropped on the plain `new Notification` fallback.
+ * @param {{ title: string, body?: string, tag?: string, data?: Record<string, unknown>, actions?: Array<{ action: string, title: string }>, requireInteraction?: boolean }} n
  * @returns {Promise<boolean>} whether a notification was shown
  */
 export async function showSystemNotification(n) {
   if (notificationState() !== 'granted') return false;
-  const options = { body: n.body ?? '', tag: n.tag, icon: 'icons/icon-192.png' };
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
-    if (reg) await reg.showNotification(n.title, options);
-    else new Notification(n.title, options);
+    if (reg) {
+      const max = /** @type {any} */ (Notification).maxActions ?? 2;
+      await reg.showNotification(n.title, {
+        body: n.body ?? '',
+        tag: n.tag,
+        icon: 'icons/icon-192.png',
+        badge: 'icons/icon-192.png',
+        data: n.data,
+        requireInteraction: n.requireInteraction,
+        /** @type {any} */ ...({ actions: (n.actions ?? []).slice(0, max) }),
+      });
+    } else {
+      new Notification(n.title, { body: n.body ?? '', tag: n.tag, icon: 'icons/icon-192.png' });
+    }
     return true;
   } catch {
     return false;

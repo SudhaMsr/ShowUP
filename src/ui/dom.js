@@ -101,3 +101,15 @@ export function confirmDialog(title, body, confirmLabel = 'Confirm') {
     dlg.showModal();
   });
 }
+
+/**
+ * SVG element builder (SVG needs its own namespace). Same rules as h(): strings are text.
+ * @param {string} tag @param {Record<string, string|number>} [attrs] @param {...(Node|string)} children
+ * @returns {SVGElement}
+ */
+export function s(tag, attrs = {}, ...children) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+  for (const c of children) el.append(c);
+  return el;
+}

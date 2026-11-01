@@ -72,10 +72,43 @@ export async function newPage(browser, o = {}) {
   });
 }
 
-/** @param {import('playwright').Page} page @param {string} url */
+export const TEST_NAME = 'Tester';
+export const TEST_PASSWORD = 'correct-horse-9';
+
+/**
+ * Load the app and get past the sign-in screen: creates the account on a fresh
+ * browser profile, or unlocks an existing one. "Keep me signed in" is ticked so
+ * reloads inside a test resume straight away (auth tests drive the screen themselves).
+ * @param {import('playwright').Page} page @param {string} url
+ */
 export async function open(page, url, hash = '') {
   await page.goto(url + hash);
+  await page.waitForSelector('html[data-ready="true"], #auth-form');
+  if (await page.locator('#auth-form').count()) {
+    await signInFlow(page);
+    if (hash) await page.evaluate((h) => (location.hash = h), hash);
+  }
+}
+
+/** @param {import('playwright').Page} page */
+export async function signInFlow(page) {
+  const creating = (await page.locator('#auth-name').count()) > 0;
+  if (creating) {
+    await page.fill('#auth-name', TEST_NAME);
+    await page.fill('#auth-password', TEST_PASSWORD);
+    await page.fill('#auth-confirm', TEST_PASSWORD);
+  } else {
+    await page.fill('#auth-password', TEST_PASSWORD);
+  }
+  await page.check('#auth-keep');
+  await page.click('#auth-submit');
   await page.waitForSelector('html[data-ready="true"]');
+  if (creating) {
+    // Tests that jump the clock forward would otherwise trip the idle auto-lock.
+    await page.evaluate(() => (location.hash = '#/settings'));
+    await page.selectOption('#acc-idle', '0');
+    await page.evaluate(() => (location.hash = '#/today'));
+  }
 }
 
 /** Capture-by-typing, then save from the review dialog. */
@@ -124,7 +157,7 @@ export async function expectText(page, selector, re, timeout = 5000) {
   );
 }
 
-const ROUTE_TITLES = /** @type {Record<string,string>} */ ({ '#/today': 'Today', '#/upcoming': 'Upcoming', '#/capture': 'Capture', '#/settings': 'Settings' });
+const ROUTE_TITLES = /** @type {Record<string,string>} */ ({ '#/today': 'Today', '#/upcoming': 'Upcoming', '#/capture': 'Capture', '#/settings': 'Settings', '#/calendar': 'Calendar', '#/board': 'Board', '#/insights': 'Insights' });
 
 /**
  * Click a main-nav link and wait until that view has actually rendered

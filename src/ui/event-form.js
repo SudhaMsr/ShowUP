@@ -1,28 +1,11 @@
 // @ts-check
 import { EVENT_TYPES, STATUSES } from '../domain/event.js';
 import { h } from './dom.js';
+import { DEFAULT_REMINDER_SETTINGS } from '../domain/reminders.js';
+import { offsetsEditor } from './offsets-editor.js';
 import { TYPE_LABEL } from './format.js';
 
 let uid = 0;
-
-/** Reminder presets (minutes before). `default` means "use my settings". */
-export const REMINDER_PRESETS = /** @type {Array<{ value: string, label: string, offsets: number[]|null }>} */ ([
-  { value: 'default', label: 'My default reminders', offsets: null },
-  { value: 'none', label: 'No reminders', offsets: [] },
-  { value: 'start', label: 'At start time', offsets: [0] },
-  { value: '15', label: '15 minutes before', offsets: [15] },
-  { value: '60', label: '1 hour before', offsets: [60] },
-  { value: '1440', label: '1 day before', offsets: [1440] },
-  { value: '1440+60', label: '1 day and 1 hour before', offsets: [1440, 60] },
-  { value: '2880+60', label: '2 days and 1 hour before', offsets: [2880, 60] },
-]);
-
-/** @param {number[]|null|undefined} offsets */
-function presetValue(offsets) {
-  if (offsets == null) return 'default';
-  const key = JSON.stringify([...offsets].sort((a, b) => b - a));
-  return REMINDER_PRESETS.find((p) => p.offsets && JSON.stringify(p.offsets) === key)?.value ?? 'default';
-}
 
 /**
  * Event fields as a reusable form body.
@@ -60,6 +43,17 @@ export function eventForm(draft, opts = {}) {
   const select = (/** @type {Array<[string,string]>} */ options, /** @type {string} */ value) =>
     h('select', null, options.map(([v, l]) => h('option', { value: v, selected: v === value }, l)));
 
+  // Reminders: use my defaults / none / pick my own (presets + custom times).
+  const reminderMode = draft.reminders == null ? 'default' : draft.reminders.length ? 'custom' : 'none';
+  const offsets = offsetsEditor(draft.reminders?.length ? draft.reminders : DEFAULT_REMINDER_SETTINGS.reminderOffsets);
+  const offsetsBox = h('div', { class: 'field field-wide', id: `f${n}-offsets`, hidden: reminderMode !== 'custom' }, offsets.el);
+  const reminderSelect = /** @type {HTMLSelectElement} */ (
+    select([['default', 'My default reminders'], ['none', 'No reminders'], ['custom', 'Choose times…']], reminderMode)
+  );
+  reminderSelect.addEventListener('change', () => {
+    offsetsBox.hidden = reminderSelect.value !== 'custom';
+  });
+
   const el = h('div', { class: 'form-grid' },
     field('title', 'Title', /** @type {HTMLInputElement} */ (text('title', draft.title, { required: true, maxlength: 200 })), { wide: true, flag: issues.has('title') }),
     field('date', 'Date', /** @type {HTMLInputElement} */ (h('input', { type: 'date', value: draft.date ?? '', required: true })), {
@@ -76,7 +70,8 @@ export function eventForm(draft, opts = {}) {
     opts.full ? field('organizer', 'Organiser / series', /** @type {HTMLInputElement} */ (text('organizer', draft.organizer))) : null,
     opts.full ? field('url', 'Link', /** @type {HTMLInputElement} */ (h('input', { type: 'url', value: draft.url ?? '', placeholder: 'https://', maxlength: 2000 })), { wide: true }) : null,
     opts.full ? field('status', 'Status', /** @type {HTMLSelectElement} */ (select(STATUSES.map((s) => [s, s.charAt(0).toUpperCase() + s.slice(1)]), draft.status ?? 'upcoming'))) : null,
-    opts.full ? field('reminders', 'Remind me', /** @type {HTMLSelectElement} */ (select(REMINDER_PRESETS.map((p) => [p.value, p.label]), presetValue(draft.reminders)))) : null,
+    opts.full ? field('reminders', 'Remind me', reminderSelect) : null,
+    opts.full ? offsetsBox : null,
     opts.full ? field('notes', 'Notes', /** @type {HTMLTextAreaElement} */ (h('textarea', { rows: 3, maxlength: 2000 }, draft.notes ?? '')), { wide: true }) : null,
   );
 
@@ -99,7 +94,8 @@ export function eventForm(draft, opts = {}) {
         out.url = v('url');
         out.status = v('status');
         out.notes = v('notes');
-        out.reminders = REMINDER_PRESETS.find((p) => p.value === v('reminders'))?.offsets ?? null;
+        const mode = v('reminders');
+        out.reminders = mode === 'none' ? [] : mode === 'custom' ? offsets.get() : null;
       }
       return out;
     },

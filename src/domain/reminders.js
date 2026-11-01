@@ -9,7 +9,11 @@ import { byStart } from './event.js';
  */
 
 /** @type {ReminderSettings} */
-export const DEFAULT_REMINDER_SETTINGS = { reminderOffsets: [1440, 60], allDayReminderHour: 9 };
+export const DEFAULT_REMINDER_SETTINGS = { reminderOffsets: [60, 1], allDayReminderHour: 9 };
+
+/** Largest reminder lead time a user may set (minutes) and how many they may stack. */
+export const MAX_OFFSET_MINUTES = 60 * 24 * 30;
+export const MAX_OFFSETS = 8;
 
 /**
  * Local Date for the event's start. All-day events anchor at the configured hour.
@@ -70,20 +74,98 @@ export function dueReminders(events, settings, from, to) {
 }
 
 /**
- * Human text for an offset in minutes.
+ * Human text for an offset in minutes: "1 minute before", "1 hour 30 minutes before".
  * @param {number} minutes
  */
 export function describeOffset(minutes) {
   if (minutes === 0) return 'at start time';
-  if (minutes % 1440 === 0) {
-    const d = minutes / 1440;
-    return d === 1 ? '1 day before' : `${d} days before`;
+  const d = Math.floor(minutes / 1440);
+  const hh = Math.floor((minutes % 1440) / 60);
+  const m = minutes % 60;
+  /** @type {string[]} */
+  const parts = [];
+  if (d) parts.push(d === 1 ? '1 day' : `${d} days`);
+  if (hh) parts.push(hh === 1 ? '1 hour' : `${hh} hours`);
+  if (m) parts.push(m === 1 ? '1 minute' : `${m} minutes`);
+  return `${parts.join(' ')} before`;
+}
+
+/**
+ * Turn a user-typed custom reminder ("90", "minutes") into minutes.
+ * Returns null for anything that is not a whole number from 0 up to 30 days.
+ * @param {unknown} amount @param {string} unit  "minutes" | "hours" | "days"
+ * @returns {number|null}
+ */
+export function parseOffsetInput(amount, unit) {
+  const text = String(amount ?? '').trim();
+  if (!/^\d{1,6}$/.test(text)) return null;
+  const factor = unit === 'days' ? 1440 : unit === 'hours' ? 60 : unit === 'minutes' ? 1 : 0;
+  if (!factor) return null;
+  const minutes = Number(text) * factor;
+  return minutes <= MAX_OFFSET_MINUTES ? minutes : null;
+}
+
+// ---- "How did it go?" follow-up -------------------------------------------
+
+/** Assume this long when an event has a start time but no end time. */
+export const FOLLOW_UP_DEFAULT_MINUTES = 90;
+/** All-day events are asked about at this local hour. */
+export const FOLLOW_UP_ALL_DAY_HOUR = 20;
+/** Do not nag about events that ended more than this long ago. */
+export const FOLLOW_UP_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * When to ask "did you go?" for an event: its end time, or start + 90 min,
+ * or 20:00 for all-day events.
+ * @param {Pick<ShowUpEvent,'date'|'time'|'endTime'>} e
+ * @returns {Date}
+ */
+export function followUpAt(e) {
+  const [y, m, d] = e.date.split('-').map(Number);
+  if (e.time && e.endTime) {
+    const [hh, mm] = e.endTime.split(':').map(Number);
+    return new Date(y, m - 1, d, hh, mm, 0, 0);
   }
-  if (minutes % 60 === 0) {
-    const h = minutes / 60;
-    return h === 1 ? '1 hour before' : `${h} hours before`;
+  if (e.time) {
+    const start = startDate(e);
+    return new Date(start.getTime() + FOLLOW_UP_DEFAULT_MINUTES * 60_000);
   }
-  return `${minutes} minutes before`;
+  return new Date(y, m - 1, d, FOLLOW_UP_ALL_DAY_HOUR, 0, 0, 0);
+}
+
+/**
+ * Events whose follow-up time falls in (from, to] and that are still "upcoming".
+ * @param {ShowUpEvent[]} events @param {Date} from exclusive @param {Date} to inclusive
+ * @returns {Array<{ key: string, at: Date, event: ShowUpEvent }>}
+ */
+export function dueFollowUps(events, from, to) {
+  /** @type {Array<{ key: string, at: Date, event: ShowUpEvent }>} */
+  const out = [];
+  for (const event of events) {
+    if (event.status !== 'upcoming') continue;
+    const at = followUpAt(event);
+    if (at > from && at <= to) out.push({ key: `${event.id}:after`, at, event });
+  }
+  return out.sort((a, b) => a.at.getTime() - b.at.getTime());
+}
+
+/**
+ * The next future moment (a reminder or a follow-up) that needs attention,
+ * so the app can wake exactly then instead of only polling.
+ * @param {ShowUpEvent[]} events @param {ReminderSettings} settings @param {Date} now
+ * @returns {Date|null}
+ */
+export function nextWakeAt(events, settings, now) {
+  let best = /** @type {Date|null} */ (null);
+  const consider = (/** @type {Date} */ t) => {
+    if (t > now && (!best || t < best)) best = t;
+  };
+  for (const e of events) {
+    if (e.status !== 'upcoming') continue;
+    for (const r of reminderSchedule(e, settings)) consider(r.at);
+    consider(followUpAt(e));
+  }
+  return best;
 }
 
 /**

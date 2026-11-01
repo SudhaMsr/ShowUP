@@ -20,14 +20,14 @@ Everything lands in one place with a "what's today, when, where" view.
 1. **Lifecycle, not just a calendar entry.** upcoming, attended, missed, cancelled, with notes. Your history becomes a record of what you went to.
 2. **Review-before-save capture.** Voice, screenshot and text all produce an editable draft. Uncertain fields (ambiguous "2.30", missing month) are highlighted instead of silently guessed.
 3. **Imports the spreadsheet you already have.** Reads `.xlsx` directly in the browser, including messy rows. No competitor does this.
-4. **Local-first and private.** Data lives in your browser (IndexedDB). No account, no server, works offline. AI extraction is opt-in with your own API key.
+4. **Local-first and private.** Data lives in your browser (IndexedDB), encrypted under a device password. No server, works offline. AI extraction is opt-in with your own API key.
 5. **Reminders that survive a closed tab.** One-click `.ics` export carries real alarms for your native calendar.
 6. **Zero-dependency runtime.** No framework or bundler; the shipped code is the code in `src/`.
 
 ## 2. Constraints that shaped the design
 
 * **Hosting is GitHub Pages**: static files only, no server, no secrets.
-* Therefore: no backend, no accounts, **local-first PWA**. Auth, payments and server load do not exist in this system. "Thousands of concurrent users" is satisfied structurally, since each user's data and compute live on their device and the host is a CDN.
+* Therefore: no backend, **local-first PWA**. Payments and server load do not exist in this system; the sign-in is a device lock, not a cloud account. "Thousands of concurrent users" is satisfied structurally, since each user's data and compute live on their device and the host is a CDN.
 * **Browsers cannot reliably fire notifications while fully closed without a push server.** The Notification Triggers API was abandoned. ShowUp is honest about this:
   * While open or installed and running, reminders fire via the service worker notification API, with an in-app banner fallback.
   * On open, missed reminders for events still ahead are surfaced as a catch-up banner.
@@ -83,6 +83,15 @@ See [SCHEMA.md](SCHEMA.md). Dates are **civil local date + optional civil time**
 * Imported files are parsed defensively: size caps, entry-count caps, decompression-size caps (zip-bomb guard), string length caps.
 * All imported and captured fields are length-limited and type-checked by `validate()`; `url` must be `http(s):`.
 
+### 6.1 Device account and encryption
+
+* A random 256-bit data key (DEK) encrypts every record with AES-GCM; each record's slot (`events:<id>`, `meta:<key>`) is bound as additional authenticated data, so ciphertext cannot be swapped between records.
+* The DEK is wrapped by a key derived from the password (PBKDF2-SHA256, 310,000 iterations, random salt). A wrong password fails authentication and nothing else is revealed. Changing the password re-wraps the same DEK, so no record is re-encrypted.
+* The unwrapped DEK is a non-extractable `CryptoKey`. "Keep me signed in" stores that key object in IndexedDB for 30 days; the key bytes are never readable by script.
+* Repeated wrong passwords trigger a back-off (5 free attempts, then 30 s doubling to 15 min). Idle auto-lock reloads the app, discarding in-memory state.
+* Honest limits: this protects data at rest against someone reading browser storage. It cannot protect against malware or a hostile browser extension on an unlocked device, and a forgotten password is unrecoverable. Data saved before sign-in existed is encrypted automatically on first unlock (`migrate()`).
+* The notification service worker only ever stores `{event id, outcome}` in a separate `showup-pending` database. Titles and places are never written outside the encrypted store.
+
 ## 7. Performance and scale
 
 * Rendering is O(n) per view over in-memory events; a 10k-event dataset is validated in tests. IndexedDB access is indexed by `date`.
@@ -107,6 +116,8 @@ Browser tests use Playwright driving real Chrome rather than Selenium. Both auto
 * **ADR-002 Vanilla ES modules, no framework or bundler.** Zero supply-chain surface, no build breakage, small payload. A build step exists only to stamp the service-worker cache version.
 * **ADR-003 Floating civil time.** No TZ column in events, so DST can never shift an event.
 * **ADR-004 Closed-app reminders via ICS alarms; push relay deferred.** A relay needs a server and VAPID keys. It can be added behind the same `reminderSchedule` function.
+* **ADR-006 Device-bound encryption instead of a cloud login.** A server-backed login would need a backend, a user database and breach responsibility, and would send event data off the device. A password-wrapped data key gives real protection at rest with none of that. Trade-off: no recovery and no sync.
+* **ADR-007 Motion without animation libraries.** Native Web Animations/CSS, View-free entrance transitions, a hand-written WebGL fragment shader for the sign-in backdrop, SVG for the success ring, canvas for confetti. All honour `prefers-reduced-motion`. GSAP, Framer Motion, Three.js and Spline were not used: Framer Motion is React-only, and the others would add a runtime dependency (and a CDN) to an app whose design goal is zero dependencies.
 * **ADR-005 AI is optional and BYO-key.** Free, private default (rules + on-device OCR); better accuracy if the user opts in.
 
 ## 10. Known limitations

@@ -84,19 +84,36 @@ function done(tx) {
   });
 }
 
-/** @implements {Repository} */
+/**
+ * @typedef {import('../app/crypto.js').Codec} Codec
+ */
+
+/** @param {unknown} v */
+function sealedShape(v) {
+  return Boolean(v) && typeof v === 'object' && /** @type {any} */ (v).enc === 1 && typeof /** @type {any} */ (v).iv === 'string' && typeof /** @type {any} */ (v).ct === 'string';
+}
+
+/**
+ * IndexedDB-backed repository. With a codec, every record is stored encrypted
+ * and only the id/key stays readable. Records saved before encryption was turned
+ * on (plain objects) are still read, and `migrate()` re-saves them encrypted.
+ * @implements {Repository}
+ */
 export class IndexedDbRepository {
-  /** @param {IDBDatabase} db */
-  constructor(db) {
+  /** @param {IDBDatabase} db @param {Codec|null} [codec] */
+  constructor(db, codec = null) {
     this.db = db;
+    this.codec = codec;
     this.persistent = true;
+    /** Records that could not be decrypted (wrong key or tampering). */
+    this.unreadable = 0;
   }
 
   /**
-   * @param {string} [name]
+   * @param {string} [name] @param {Codec|null} [codec]
    * @returns {Promise<IndexedDbRepository>}
    */
-  static open(name = DB_NAME) {
+  static open(name = DB_NAME, codec = null) {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(name, DB_VERSION);
       req.onupgradeneeded = () => {
@@ -112,11 +129,15 @@ export class IndexedDbRepository {
         const db = req.result;
         // Another tab upgrading the schema must not be blocked by this one.
         db.onversionchange = () => db.close();
-        resolve(new IndexedDbRepository(db));
+        resolve(new IndexedDbRepository(db, codec));
       };
       req.onerror = () => reject(req.error);
       req.onblocked = () => reject(new Error('Database upgrade blocked by another tab'));
     });
+  }
+
+  close() {
+    this.db.close();
   }
 
   /** @param {string} store @param {IDBTransactionMode} mode */
@@ -125,25 +146,44 @@ export class IndexedDbRepository {
     return { tx, os: tx.objectStore(store) };
   }
 
+  /** Stored form of an event. @param {ShowUpEvent} e */
+  async #packEvent(e) {
+    return this.codec ? { id: e.id, ...(await this.codec.encode(`events:${e.id}`, e)) } : e;
+  }
+
+  /** Back to an event; undefined if it cannot be read. @param {any} rec */
+  async #unpackEvent(rec) {
+    if (!sealedShape(rec)) return /** @type {ShowUpEvent} */ (rec);
+    if (!this.codec) return undefined;
+    try {
+      return /** @type {ShowUpEvent} */ (await this.codec.decode(`events:${rec.id}`, rec));
+    } catch {
+      this.unreadable++;
+      return undefined;
+    }
+  }
+
   async all() {
     const { os } = this.#tx('events', 'readonly');
-    return /** @type {ShowUpEvent[]} */ (await wrap(os.getAll()));
+    const rows = /** @type {any[]} */ (await wrap(os.getAll()));
+    const out = await Promise.all(rows.map((r) => this.#unpackEvent(r)));
+    return /** @type {ShowUpEvent[]} */ (out.filter(Boolean));
   }
   /** @param {string} id */
   async get(id) {
     const { os } = this.#tx('events', 'readonly');
-    return /** @type {ShowUpEvent|undefined} */ (await wrap(os.get(id)));
+    return this.#unpackEvent(await wrap(os.get(id)));
   }
   /** @param {ShowUpEvent} e */
   async put(e) {
-    const { tx, os } = this.#tx('events', 'readwrite');
-    os.put(e);
-    await done(tx);
+    return this.putMany([e]);
   }
   /** @param {ShowUpEvent[]} list */
   async putMany(list) {
+    // Encrypt first: an IndexedDB transaction closes if we await non-IDB work inside it.
+    const rows = await Promise.all(list.map((e) => this.#packEvent(e)));
     const { tx, os } = this.#tx('events', 'readwrite');
-    for (const e of list) os.put(e);
+    for (const r of rows) os.put(r);
     await done(tx);
   }
   /** @param {string} id */
@@ -160,13 +200,22 @@ export class IndexedDbRepository {
   /** @param {string} key */
   async getMeta(key) {
     const { os } = this.#tx('meta', 'readonly');
-    const row = /** @type {{ key: string, value: unknown } | undefined} */ (await wrap(os.get(key)));
-    return row?.value;
+    const row = /** @type {any} */ (await wrap(os.get(key)));
+    if (!row) return undefined;
+    if (!sealedShape(row)) return row.value;
+    if (!this.codec) return undefined;
+    try {
+      return await this.codec.decode(`meta:${key}`, row);
+    } catch {
+      this.unreadable++;
+      return undefined;
+    }
   }
   /** @param {string} key @param {unknown} value */
   async setMeta(key, value) {
+    const row = this.codec ? { key, ...(await this.codec.encode(`meta:${key}`, value)) } : { key, value };
     const { tx, os } = this.#tx('meta', 'readwrite');
-    os.put({ key, value });
+    os.put(row);
     await done(tx);
   }
   /** @param {string} key */
@@ -175,18 +224,48 @@ export class IndexedDbRepository {
     os.delete(key);
     await done(tx);
   }
+
+  /**
+   * Encrypt anything still stored in plain form. Safe to run repeatedly.
+   * @returns {Promise<number>} how many records were converted
+   */
+  async migrate() {
+    const codec = this.codec;
+    if (!codec) return 0;
+    const events = /** @type {any[]} */ (await wrap(this.#tx('events', 'readonly').os.getAll())).filter((r) => !sealedShape(r));
+    const metas = /** @type {any[]} */ (await wrap(this.#tx('meta', 'readonly').os.getAll())).filter((r) => !sealedShape(r));
+    const eventRows = await Promise.all(events.map((e) => this.#packEvent(e)));
+    const metaRows = await Promise.all(metas.map(async (m) => ({ key: m.key, ...(await codec.encode(`meta:${m.key}`, m.value)) })));
+    if (eventRows.length) {
+      const { tx, os } = this.#tx('events', 'readwrite');
+      for (const r of eventRows) os.put(r);
+      await done(tx);
+    }
+    if (metaRows.length) {
+      const { tx, os } = this.#tx('meta', 'readwrite');
+      for (const r of metaRows) os.put(r);
+      await done(tx);
+    }
+    return eventRows.length + metaRows.length;
+  }
+
+  /** How many records are still in plain form (used to offer migration). */
+  async plaintextCount() {
+    const events = /** @type {any[]} */ (await wrap(this.#tx('events', 'readonly').os.getAll()));
+    return events.filter((r) => !sealedShape(r)).length;
+  }
 }
 
 /**
  * Open the best available repository. Falls back to memory (flagged
  * `persistent: false`) so the app still works when storage is blocked.
- * @param {string} [name]
+ * @param {string} [name] @param {Codec|null} [codec]
  * @returns {Promise<Repository>}
  */
-export async function openRepository(name = DB_NAME) {
+export async function openRepository(name = DB_NAME, codec = null) {
   try {
     if (typeof indexedDB === 'undefined') throw new Error('IndexedDB unavailable');
-    return await IndexedDbRepository.open(name);
+    return await IndexedDbRepository.open(name, codec);
   } catch {
     return new MemoryRepository();
   }

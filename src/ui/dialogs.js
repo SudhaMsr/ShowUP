@@ -147,7 +147,7 @@ export function openReview(store, drafts, source, opts = {}) {
 
 /**
  * Preview an import and let the user confirm.
- * @param {{ title: string, total: number, flagged: number, skipped: Array<{ row: number, reason: string, preview: string }>, extra?: string }} s
+ * @param {{ title: string, total: number, flagged: number, skipped: Array<{ row: number, reason: string, preview: string }>, extra?: string, files?: Array<{ name: string, count: number, flagged: number, notes: string[], error?: string }> }} s
  * @returns {Promise<boolean>}
  */
 export function openImportPreview(s) {
@@ -160,6 +160,14 @@ export function openImportPreview(s) {
           h('p', null, h('strong', null, `${s.total} event${s.total === 1 ? '' : 's'}`), ' ready to import.',
             s.flagged ? ` ${s.flagged} ${s.flagged === 1 ? 'has' : 'have'} uncertain details and will be marked "Check details".` : ''),
           s.extra ? h('p', { class: 'muted' }, s.extra) : null,
+          s.files && (s.files.length > 1 || s.files.some((f) => f.error || f.notes.length))
+            ? h('ul', { class: 'file-results', 'aria-label': 'Results per file' },
+                s.files.map((f) =>
+                  h('li', { class: f.error ? 'file-bad' : '' },
+                    h('strong', null, f.name),
+                    h('span', { class: 'muted' }, f.error ? ` · ${f.error}` : ` · ${f.count} event${f.count === 1 ? '' : 's'}${f.flagged ? `, ${f.flagged} to check` : ''}`),
+                    ...f.notes.map((n) => h('small', { class: 'muted file-note' }, n)))))
+            : null,
           s.skipped.length
             ? h('div', null,
                 h('p', null, h('strong', null, `${s.skipped.length} row${s.skipped.length === 1 ? '' : 's'} skipped`)),

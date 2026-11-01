@@ -11,6 +11,7 @@ import { dayLabel, mapsUrl, safeHref, TYPE_LABEL, time12 } from './format.js';
  * @property {(e: ShowUpEvent, status: import('../domain/event.js').EventStatus) => void} setStatus
  * @property {(e: ShowUpEvent) => void} remove
  * @property {(e: ShowUpEvent) => void} downloadIcs
+ * @property {(e: ShowUpEvent) => void} [duplicate]
  */
 
 /**
@@ -43,6 +44,7 @@ export function eventCard(e, o) {
     h('summary', { class: 'btn btn-small', 'aria-label': `More actions for ${e.title}` }, 'More'),
     h('div', { class: 'more-menu', role: 'group' },
       h('button', { class: 'menu-item', type: 'button', onclick: () => actions.downloadIcs(e) }, 'Add to calendar (.ics)'),
+      actions.duplicate ? h('button', { class: 'menu-item', type: 'button', onclick: () => actions.duplicate?.(e) }, 'Duplicate') : null,
       h('a', { class: 'menu-item', href: googleCalendarUrl(e), target: '_blank', rel: 'noopener noreferrer' }, 'Add to Google Calendar'),
       href ? h('a', { class: 'menu-item', href, target: '_blank', rel: 'noopener noreferrer' }, 'Open event page') : null,
       e.status !== 'attended' ? h('button', { class: 'menu-item', type: 'button', onclick: () => actions.setStatus(e, 'attended') }, 'Mark attended') : null,
@@ -51,7 +53,7 @@ export function eventCard(e, o) {
       e.status !== 'upcoming' ? h('button', { class: 'menu-item', type: 'button', onclick: () => actions.setStatus(e, 'upcoming') }, 'Back to upcoming') : null,
       h('button', { class: 'menu-item menu-danger', type: 'button', onclick: () => actions.remove(e) }, 'Delete')));
 
-  return h('article', { class: `ev ${closed ? 'ev-closed' : ''}`, dataset: { id: e.id, status: e.status }, 'aria-label': e.title },
+  return h('article', { class: `ev ${closed ? 'ev-closed' : ''}`, dataset: { id: e.id, status: e.status, type: e.type }, 'aria-label': e.title },
     h('div', { class: 'ev-stub' },
       h('span', { class: 'ev-time' }, e.time ? time12(e.time) : 'All day'),
       o.showDate ? h('span', { class: 'ev-date' }, dayLabel(e.date, now)) : null,

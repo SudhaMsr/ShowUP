@@ -28,10 +28,23 @@ Indexes: `date` (range scans for agenda), `status`.
 
 Key/value settings and runtime state: `settings`, `lastTickAt`, `firedReminders` (rolling, pruned at 30 days), `aiKey` (never exported).
 
+## Encrypted records
+
+When signed in, rows in `events` and `meta` are stored as `{ id | key, enc: 1, iv, ct }`: `iv` is a random 96-bit nonce and `ct` is AES-GCM ciphertext (base64) of the JSON record, authenticated against its slot (`events:<id>` or `meta:<key>`). Only the id/key stays readable so lookups work. Plain rows from older versions are still readable and are converted by `migrate()` on first unlock.
+
+## Auth database `showup-auth`
+
+* `profile/main`: `{ v, name, vault: { kdf, iterations, salt, iv, wrapped }, createdAt, failed, lockedUntil, idleMinutes }`. The vault holds the *wrapped* data key, never the password or the key in the clear.
+* `session/main`: `{ key: CryptoKey (non-extractable), expiresAt }` when "keep me signed in" is on.
+
+## Pending outcomes database `showup-pending`
+
+Written by the service worker when you press a notification action: `{ id, status }` only, applied and cleared by the page on its next start.
+
 ## Settings object
 
 ```json
-{ "reminderOffsets": [1440, 60], "allDayReminderHour": 9, "notifications": true,
+{ "reminderOffsets": [60, 1], "allDayReminderHour": 9, "notifications": true,
   "aiModel": "claude-sonnet-5-5", "theme": "system" }
 ```
 
