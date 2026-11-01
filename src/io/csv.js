@@ -48,7 +48,7 @@ export function parseCSV(text) {
 }
 
 /**
- * Quote a field; also neutralise spreadsheet formula injection (=, +, -, @).
+ * Quote a field; also neutralise spreadsheet formula injection (leading equals, plus, minus or at-sign).
  * @param {unknown} v
  */
 export function csvField(v) {
