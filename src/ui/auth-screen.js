@@ -69,6 +69,33 @@ export function showAuthScreen(root, auth, hooks) {
       document.getElementById(id)?.setAttribute('aria-invalid', msg ? 'true' : 'false');
     };
 
+    /** Floating deadline cards that tilt toward the pointer. Pure CSS 3D; motion is off when reduced motion is requested. */
+    const cardsScene = () => {
+      const cards = [
+        ['internship', 'Internship', 'Summer placement', 'Due in 3 days', 'Working'],
+        ['scholarship', 'Scholarship', 'Merit award', 'Due tomorrow', 'Ready to submit'],
+        ['hackathon', 'Hackathon', 'Weekend build', 'Closes Friday', 'Found'],
+        ['exam', 'Exam', 'Algorithms final', '12 days to go', '5 of 11 topics'],
+      ];
+      const scene = h('div', { class: 'lp-scene', 'aria-hidden': 'true' },
+        cards.map(([k, tag, title, due, stage], i) =>
+          h('div', { class: `lp-3d lp-3d-${i + 1}` },
+            h('div', { class: `lp-3d-card lp-k-${k}` },
+              h('span', { class: 'lp-3d-tag' }, tag),
+              h('strong', null, title),
+              h('span', { class: 'lp-3d-due' }, due),
+              h('span', { class: 'lp-3d-stage' }, stage)))));
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches && matchMedia('(pointer: fine)').matches) {
+        scene.addEventListener('pointermove', (ev) => {
+          const r = scene.getBoundingClientRect();
+          scene.style.setProperty('--px', String(((ev.clientX - r.left) / r.width - 0.5).toFixed(3)));
+          scene.style.setProperty('--py', String(((ev.clientY - r.top) / r.height - 0.5).toFixed(3)));
+        });
+        scene.addEventListener('pointerleave', () => { scene.style.setProperty('--px', '0'); scene.style.setProperty('--py', '0'); });
+      }
+      return scene;
+    };
+
     /**
      * Notion-style front page shown before every sign-in or sign-up: nav, big headline, demo, then the form.
      * @param {HTMLElement} card
@@ -96,6 +123,7 @@ export function showAuthScreen(root, auth, hooks) {
         h('div', { class: 'lp-cta' },
           h('button', { class: 'btn btn-primary lp-btn', type: 'button', onclick: toForm }, returning ? `Log in${opts.name ? `, ${opts.name}` : ''}` : 'Get ShowUp free'),
           h('button', { class: 'btn lp-btn lp-btn-soft', type: 'button', onclick: () => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' }) }, 'See how it works')),
+        cardsScene(),
         h('div', { class: 'lp-demo', id: 'how' }, demoFrame()));
       const how = h('section', { class: 'lp-three', 'aria-label': 'What ShowUp does' },
         [['Capture', 'Paste text, say it, snap a screenshot or import a sheet. ShowUp fills in the details.'],

@@ -938,3 +938,30 @@ nav::-webkit-scrollbar { display: none; }
   body:not(.auth-open) .btn-lock { grid-column: 1 / -1; }
   body:not(.auth-open) #palette-btn, body:not(.auth-open) #theme-btn { width: 100%; }
 }
+.pg input.pg-title-input { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; box-shadow: none; padding: 6px 0; min-height: 0; }
+.pg input.pg-title-input:focus { border-bottom-color: var(--accent); box-shadow: none; }
+.pg input.pg-text { border: 1px solid transparent; background: transparent; box-shadow: none; }
+.pg input.pg-text:focus { border-color: var(--line); background: var(--card); }
+.pg input.pg-h1 { font-size: 1.5rem; font-weight: 700; }
+.pg input.pg-h2 { font-size: 1.2rem; font-weight: 700; }
+.pg input.pg-quote { border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; font-style: italic; }
+.pg .pg-block:hover input.pg-text { border-color: var(--line); }
+
+/* Front page 3D cards */
+.lp-scene { --px: 0; --py: 0; position: relative; width: min(100%, 920px); height: 330px; margin-top: clamp(18px, 4vw, 44px); perspective: 1100px; }
+.lp-3d { position: absolute; width: min(230px, 40%); transform: translate3d(calc(var(--px) * var(--dx, 14px)), calc(var(--py) * var(--dy, 10px)), 0); transition: transform .25s var(--ease, ease-out); }
+.lp-3d-card { display: grid; gap: 6px; text-align: left; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: 0 22px 44px -18px rgba(25, 25, 25, .3); transform: rotateY(var(--ry, 0deg)) rotateX(calc(var(--rx, 6deg) - var(--py) * 8deg)) rotateZ(var(--rz, 0deg)); animation: lp-float 6s ease-in-out infinite; animation-delay: var(--d, 0s); }
+.lp-3d-card strong { font-size: 1.05rem; letter-spacing: -0.01em; }
+.lp-3d-tag { justify-self: start; font-size: .75rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--pill); color: #6b3f00; }
+.lp-k-scholarship .lp-3d-tag { background: #d8f2e4; color: #0b5d3b; }
+.lp-k-hackathon .lp-3d-tag { background: #e9e1fb; color: #4a2b9b; }
+.lp-k-exam .lp-3d-tag { background: #fde2e2; color: #8f1d1d; }
+.lp-3d-due { color: var(--ink-2); font-size: .9rem; }
+.lp-3d-stage { font-size: .8rem; color: var(--ink-2); border-top: 1px solid var(--line); padding-top: 8px; margin-top: 4px; }
+.lp-3d-1 { left: 3%; top: 56px; --ry: 18deg; --rz: -4deg; --dx: 22px; --d: 0s; }
+.lp-3d-2 { left: 33%; top: 0; --rx: 8deg; --dx: -10px; --d: -1.5s; }
+.lp-3d-3 { right: 3%; top: 64px; --ry: -18deg; --rz: 4deg; --dx: -22px; --d: -3s; }
+.lp-3d-4 { left: 36%; top: 176px; --rx: -4deg; --rz: 2deg; --ry: 8deg; --dx: 16px; --dy: 14px; --d: -4.5s; }
+@keyframes lp-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -10px; } }
+@media (max-width: 700px) { .lp-scene { height: 250px; } .lp-3d { width: 46%; } .lp-3d-2 { left: 27%; } .lp-3d-4 { display: none; } .lp-3d-1 { top: 70px; } .lp-3d-3 { top: 80px; } }
+@media (prefers-reduced-motion: reduce) { .lp-3d-card { animation: none; } .lp-3d { transition: none; } }

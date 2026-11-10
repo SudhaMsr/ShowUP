@@ -182,7 +182,7 @@ async function run(repo, account) {
     }
     document.title = `${def.title} · ShowUp`;
     view.classList.remove('welcome-page');
-    setChildren(view, h('h1', { class: 'page-title', id: 'page-title' }, def.title), def.render(ctx));
+    setChildren(view, h('h1', { class: route === '#/page' ? 'page-title sr-only' : 'page-title', id: 'page-title' }, def.title), def.render(ctx));
     if (moveFocus) view.focus({ preventScroll: true });
   }
 
