@@ -66,12 +66,12 @@ export async function mountHero3d(host) {
 
   const specs = [
     [['Internship', 'Summer placement', 'Due in 3 days', 'Working'], '#ffd88a', '#5a3a00', [-3.1, -0.2, 0.2], 0.34, 0.05],
-    [['Scholarship', 'Merit award', 'Due tomorrow', 'Ready to submit'], '#bff0d6', '#0b5d3b', [0, 0.75, 0.9], 0, -0.03],
+    [['Scholarship', 'Merit award', 'Due tomorrow', 'Ready to submit'], '#bff0d6', '#0b5d3b', [0, 0.5, 0.5], 0, -0.03],
     [['Hackathon', 'Weekend build', 'Closes Friday', 'Found'], '#e2d6ff', '#3d2391', [3.1, -0.1, 0.1], -0.34, -0.05],
-    [['Exam', 'Algorithms final', '12 days to go', '5 of 11 topics'], '#ffd0d0', '#8f1d1d', [0.35, -1.2, 0.7], 0.1, 0.03],
+    [['Exam', 'Algorithms final', '12 days to go', '5 of 11 topics'], '#ffd0d0', '#8f1d1d', [0.35, -1.25, 0.7], 0.1, 0.03],
   ];
   const geo = new T.PlaneGeometry(2.4, 1.5);
-  /** @type {{ m: any, y: number, ph: number }[]} */
+  /** @type {{ m: any, y: number, ph: number, x: number, z: number, ry: number, rz: number, delay: number, lift: number, spin: number }[]} */
   const cards = [];
   /** @type {any[]} */
   const textures = [];
@@ -85,8 +85,16 @@ export async function mountHero3d(host) {
     m.position.set(p[0], p[1], p[2]);
     m.rotation.set(0, /** @type {number} */ (ry), /** @type {number} */ (rz));
     rig.add(m);
-    cards.push({ m, y: p[1], ph: Math.random() * 6 });
+    cards.push({ m, y: p[1], ph: Math.random() * 6, x: p[0], z: p[2], ry: /** @type {number} */ (ry), rz: /** @type {number} */ (rz), delay: cards.length * 0.18, lift: 0, spin: 0 });
   }
+
+  // Slow gold rings behind the cards give the scene depth.
+  const rings = [2.5, 3.1].map((r, i) => {
+    const m = new T.Mesh(new T.RingGeometry(r, r + 0.018, 128), new T.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.22 - i * 0.08, depthWrite: false }));
+    m.position.z = -2 - i;
+    rig.add(m);
+    return m;
+  });
 
   // Gold sparks drifting upward.
   const N = 140;
@@ -121,13 +129,28 @@ export async function mountHero3d(host) {
   let tx = 0, ty = 0, rx = 0, ry = 0;
   const move = (/** @type {PointerEvent} */ ev) => {
     const r = host.getBoundingClientRect();
+    pick(ev);
     tx = ((ev.clientX - r.left) / r.width - 0.5) * 2;
     ty = ((ev.clientY - r.top) / r.height - 0.5) * 2;
   };
-  const leave = () => { tx = 0; ty = 0; };
+  const ray = new T.Raycaster();
+  const ndc = new T.Vector2();
+  /** @type {any} */
+  let hovered = null;
+  const pick = (/** @type {PointerEvent} */ ev) => {
+    const r = el.getBoundingClientRect();
+    ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(cards.map((c) => c.m))[0];
+    hovered = hit ? cards.find((c) => c.m === hit.object) : null;
+    el.style.cursor = hovered ? 'pointer' : '';
+  };
+  const click = () => { if (hovered && hovered.spin === 0) hovered.spin = 0.0001; };
+  const leave = () => { tx = 0; ty = 0; hovered = null; el.style.cursor = ''; };
   if (matchMedia('(pointer: fine)').matches) {
     host.addEventListener('pointermove', move);
     host.addEventListener('pointerleave', leave);
+    el.addEventListener('click', click);
   }
 
   let visible = true, raf = 0, last = performance.now(), t0 = 0;
@@ -139,7 +162,21 @@ export async function mountHero3d(host) {
     rx += (ty * 0.12 - rx) * 0.08;
     ry += (tx * 0.22 - ry) * 0.08;
     rig.rotation.x = rx; rig.rotation.y = ry;
-    for (const c of cards) c.m.position.y = c.y + Math.sin(t0 * 0.9 + c.ph) * 0.12;
+    const sc = Math.min(Math.max(-host.getBoundingClientRect().top / 600 + 0.5, -1), 1);
+    rig.position.y += (sc * 0.15 - rig.position.y) * 0.06;
+    rings.forEach((m, i) => { m.rotation.z = t0 * (i ? -0.05 : 0.07); m.rotation.x = 0.35 + ry * 0.5; });
+    for (const c of cards) {
+      const k = Math.min(Math.max((t0 - 0.2 - c.delay) / 1.1, 0), 1);
+      const e = 1 - Math.pow(1 - k, 4); // ease-out quart
+      c.lift += ((c === hovered ? 1 : 0) - c.lift) * 0.12;
+      if (c.spin > 0) { c.spin += dt * 1.6; if (c.spin >= 1) c.spin = 0; }
+      const spinE = c.spin > 0 ? 1 - Math.pow(1 - c.spin, 3) : 0;
+      c.m.position.set(c.x * (0.4 + 0.6 * e), c.y + (1 - e) * -2.4 + Math.sin(t0 * 0.9 + c.ph) * 0.12 + c.lift * 0.15, c.z + (1 - e) * -3 + c.lift * 0.5);
+      c.m.rotation.set(c.lift * -0.06, c.ry + (1 - e) * 1.2 + spinE * Math.PI * 2, c.rz);
+      c.m.material.opacity = e;
+      const s2 = 1 + c.lift * 0.06;
+      c.m.scale.set(s2, s2, 1);
+    }
     const a = pg.attributes.position;
     for (let i = 0; i < N; i++) {
       let y = a.getY(i) + spd[i] * dt * 0.5;
@@ -159,9 +196,10 @@ export async function mountHero3d(host) {
   return () => {
     cancelAnimationFrame(raf); io.disconnect(); ro.disconnect();
     document.removeEventListener('visibilitychange', kick);
-    host.removeEventListener('pointermove', move); host.removeEventListener('pointerleave', leave);
+    host.removeEventListener('pointermove', move); host.removeEventListener('pointerleave', leave); el.removeEventListener('click', click);
     geo.dispose(); pg.dispose(); pm.dispose(); textures.forEach((x) => x.dispose());
     for (const c of cards) c.m.material.dispose();
+    for (const m of rings) { m.geometry.dispose(); m.material.dispose(); }
     renderer.dispose(); el.remove(); host.classList.remove('lp-gl-on');
   };
 }

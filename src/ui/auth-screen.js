@@ -121,6 +121,7 @@ export function showAuthScreen(root, auth, hooks) {
             returning ? h('button', { class: 'btn', type: 'button', id: 'lp-login', onclick: toForm }, 'Log in') : null,
             h('button', { class: 'btn btn-primary', type: 'button', onclick: toForm }, returning ? 'Open ShowUp' : 'Get ShowUp free'))));
       const hero = h('section', { class: 'lp-hero lp-dark', 'aria-labelledby': 'lp-title' },
+        h('div', { class: 'lp-spot', 'aria-hidden': 'true' }),
         h('h1', { id: 'lp-title', class: 'lp-title' },
           ...['Where', 'students', 'never', 'miss', 'an'].flatMap((w) => [h('span', { class: 'lp-w' }, w), ' ']),
           h('span', { class: 'lp-w lp-mark' }, 'opportunity'), ' ',
@@ -131,6 +132,13 @@ export function showAuthScreen(root, auth, hooks) {
           h('button', { class: 'btn lp-btn lp-btn-soft', type: 'button', onclick: () => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' }) }, 'See how it works')),
         cardsScene(),
         h('div', { class: 'lp-demo', id: 'how' }, demoFrame()));
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches && matchMedia('(pointer: fine)').matches) {
+        hero.addEventListener('pointermove', (ev) => {
+          const r = hero.getBoundingClientRect();
+          hero.style.setProperty('--mx', `${ev.clientX - r.left}px`);
+          hero.style.setProperty('--my', `${ev.clientY - r.top}px`);
+        });
+      }
       const how = h('section', { class: 'lp-three', 'aria-label': 'What ShowUp does' },
         [['Capture', 'Paste text, say it, snap a screenshot or import a sheet. ShowUp fills in the details.'],
          ['Track', 'Move each opportunity from Found to Applied to Offer, with a checklist and links.'],
