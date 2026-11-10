@@ -1,5 +1,6 @@
 // @ts-check
 import { normalizeEvent, validate } from '../domain/event.js';
+import { appendStageLog, hasPipeline, isApplicationType } from '../domain/opportunity.js';
 import { DEFAULT_REMINDER_SETTINGS } from '../domain/reminders.js';
 
 /**
@@ -78,10 +79,15 @@ export function createStore(repo, opts = {}) {
     async save(input) {
       const existing = typeof input.id === 'string' ? state.events.find((e) => e.id === input.id) : undefined;
       const now = clock();
-      const event = normalizeEvent(
+      let event = normalizeEvent(
         { ...existing, ...input, createdAt: existing?.createdAt, updatedAt: now.toISOString() },
         { now },
       );
+      // A stage change (or a brand new pipeline item) is written to the stage log.
+      const prevStage = existing && existing.type === event.type ? existing.stage : null;
+      if (event.stage !== null && event.stage !== prevStage) {
+        event = { ...event, stageLog: appendStageLog(event.stageLog, event.stage, now.toISOString()) };
+      }
       const v = validate(event);
       if (!v.ok) return { ok: false, errors: v.errors };
       await repo.put(event);
@@ -100,9 +106,45 @@ export function createStore(repo, opts = {}) {
       return accepted.length;
     },
 
-    /** @param {string} id @param {import('../domain/event.js').EventStatus} status */
+    /**
+     * Record how an item went. For plain events and competitions this is
+     * attendance. For applications it maps onto the pipeline: "attended" means
+     * you applied, "cancelled" means you dropped it.
+     * @param {string} id @param {import('../domain/event.js').EventStatus} status
+     */
     async setStatus(id, status) {
+      const e = state.events.find((x) => x.id === id);
+      if (e && isApplicationType(e.type)) {
+        if (status === 'attended') return this.save({ id, status: 'upcoming', stage: e.stage === 'found' || e.stage === 'working' || e.stage === 'closed' || e.stage === null ? 'submitted' : e.stage, needsReview: false });
+        if (status === 'cancelled') return this.save({ id, status: 'cancelled', stage: 'closed', needsReview: false });
+        if (status === 'upcoming') return this.save({ id, status: 'upcoming', stage: e.stage === 'closed' ? 'found' : e.stage, needsReview: false });
+      }
+      if (e && hasPipeline(e.type) && status === 'upcoming' && e.stage === 'closed') {
+        return this.save({ id, status, stage: 'registered', needsReview: false });
+      }
       return this.save({ id, status, needsReview: false });
+    },
+
+    /**
+     * Move an opportunity to another stage.
+     * @param {string} id @param {string} stage
+     */
+    async setStage(id, stage) {
+      const e = state.events.find((x) => x.id === id);
+      if (!e || !hasPipeline(e.type)) return { ok: /** @type {const} */ (false), errors: { stage: 'This kind of event has no stages.' } };
+      // Reopening something after a missed deadline or a drop clears that outcome.
+      const reopen = e.status !== 'upcoming' && stage !== 'closed' && isApplicationType(e.type);
+      return this.save({ id, stage, ...(reopen ? { status: 'upcoming' } : {}), ...(stage === 'closed' && isApplicationType(e.type) ? { status: 'cancelled' } : {}), needsReview: false });
+    },
+
+    /**
+     * Tick or untick one checklist item.
+     * @param {string} id @param {number} index @param {boolean} done
+     */
+    async setTask(id, index, done) {
+      const e = state.events.find((x) => x.id === id);
+      if (!e || !e.tasks[index]) return { ok: /** @type {const} */ (false), errors: { tasks: 'That task no longer exists.' } };
+      return this.save({ id, tasks: e.tasks.map((t, i) => (i === index ? { ...t, done } : t)) });
     },
 
     /** @param {string} id */

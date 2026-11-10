@@ -58,3 +58,20 @@ Written by the service worker when you press a notification action: `{ id, statu
 ## Migrations
 
 `onupgradeneeded` is versioned. v1 creates both stores. Future versions must be additive; each migration has a test that opens a v(N-1) database fixture.
+
+## Opportunities (added in backup version 2)
+
+Events of type `hackathon`, `internship`, `scholarship`, `fellowship` and `competition` carry extra fields.
+Older backups load unchanged; missing fields get defaults.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `stage` | string or null | `found`, `registered`, `working`, `submitted`, `interview`, `won`, `lost`, `closed`. Valid ids depend on the type; plain events are `null` |
+| `stageLog` | `{stage, at}[]` | Up to 30 entries, appended when the stage changes |
+| `deadline` | `YYYY-MM-DD` or null | Competitions only. For internships, scholarships and fellowships the event `date` is the deadline |
+| `details` | `Record<string,string>` | Typed fields per type (prize, pay, amount, ...), see `FIELD_SPECS` in `src/domain/opportunity.js` |
+| `links` | `{label, url}[]` | Up to 10, http(s) only |
+| `tasks` | `{text, done}[]` | Up to 20 checklist items |
+
+`effectiveStatus(e)` maps a stage onto attendance (submitted counts as showing up, dropped as cancelled) so
+existing statistics keep working. CSV export gained `Stage` and `Deadline` as the last two columns.

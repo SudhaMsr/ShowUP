@@ -129,9 +129,20 @@ Browser tests use Playwright driving real Chrome rather than Selenium. Both auto
 * **ADR-008 Bring-your-own Google Client ID, read-only, approval-first.** A shared client would need a verified OAuth app and a backend for refresh tokens. A personal client works entirely in the browser. Nothing from Google is added without an explicit approval, because email parsing is a guess.
 * **ADR-005 AI is optional and BYO-key.** Free, private default (rules + on-device OCR); better accuracy if the user opts in.
 
+### Opportunities and the relay (ADR)
+
+* Stages are a separate field from `status`; `effectiveStatus` maps one onto the other, so attendance logic,
+  statistics and old backups are untouched. Pure rules live in `src/domain/opportunity.js`.
+* The optional relay (`server/`) is the only server component. It receives `(time, title, text)` tuples, never
+  events, so it needs no domain knowledge. It is optional because it must be hosted, and because anything leaving
+  the browser should be a deliberate choice. Its origin must be listed at build time (CSP `connect-src`).
+
 ## 10. Known limitations
 
 * No multi-device sync yet (export/import JSON).
 * Closed-app notifications need the ICS route or a future push relay.
 * On-device OCR quality depends on the screenshot; the review step exists for that reason.
 * Web Speech API is Chromium/Safari only; typing is the fallback elsewhere.
+
+* Web Push from the relay is verified against the RFC 8291 test vector and by decrypting in tests, not against real push services.
+* The relay stores channel secrets (Telegram token, webhook URL) in plain text on its own disk.

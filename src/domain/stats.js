@@ -1,5 +1,6 @@
 // @ts-check
 import { addDays, weekday } from './dates.js';
+import { effectiveStatus } from './opportunity.js';
 
 /**
  * Attendance statistics. Pure functions over events, so every number the
@@ -34,9 +35,10 @@ function summarise(events, start, today) {
   for (const e of events) {
     if (e.date < start || e.date > end) continue;
     w.total++;
-    if (e.status === 'attended') w.attended++;
-    else if (e.status === 'missed') w.missed++;
-    else if (e.status === 'cancelled') w.cancelled++;
+    const st = effectiveStatus(e);
+    if (st === 'attended') w.attended++;
+    else if (st === 'missed') w.missed++;
+    else if (st === 'cancelled') w.cancelled++;
     else if (e.date < today) w.toReview++;
     else w.upcoming++;
   }
@@ -69,22 +71,23 @@ export function overall(events, today) {
   /** @type {Map<string, { attended: number, missed: number }>} */
   const types = new Map();
   for (const e of events) {
-    if (e.status === 'attended') attended++;
-    else if (e.status === 'missed') missed++;
-    else if (e.status === 'cancelled') cancelled++;
+    const st = effectiveStatus(e);
+    if (st === 'attended') attended++;
+    else if (st === 'missed') missed++;
+    else if (st === 'cancelled') cancelled++;
     else if (e.date < today) toReview++;
     else upcoming++;
-    if (e.status === 'attended' || e.status === 'missed') {
+    if (st === 'attended' || st === 'missed') {
       const t = types.get(e.type) ?? { attended: 0, missed: 0 };
-      t[e.status]++;
+      t[st]++;
       types.set(e.type, t);
     }
   }
   // Streak: consecutive attended events, newest first, stopping at the first miss.
-  const judged = events.filter((e) => e.status === 'attended' || e.status === 'missed').sort((a, b) => (b.date + (b.time ?? '')).localeCompare(a.date + (a.time ?? '')));
+  const judged = events.filter((e) => ['attended', 'missed'].includes(effectiveStatus(e))).sort((a, b) => (b.date + (b.time ?? '')).localeCompare(a.date + (a.time ?? '')));
   let streak = 0;
   for (const e of judged) {
-    if (e.status !== 'attended') break;
+    if (effectiveStatus(e) !== 'attended') break;
     streak++;
   }
   const byType = [...types].map(([type, v]) => ({ type, ...v, rate: rate(v.attended, v.missed) })).sort((a, b) => b.attended + b.missed - (a.attended + a.missed));

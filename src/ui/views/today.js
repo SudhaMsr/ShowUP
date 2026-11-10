@@ -4,10 +4,11 @@ import { localISO } from '../../domain/dates.js';
 import { h } from '../dom.js';
 import { eventCard } from '../event-card.js';
 import { dayLabel, mapsUrl, time12 } from '../format.js';
+import { welcome } from '../welcome.js';
 
 /**
  * @typedef {import('../event-card.js').CardActions} CardActions
- * @typedef {{ store: import('../../app/store.js').Store, now: Date, actions: CardActions, add: () => void, goto: (route: string) => void, repaint?: () => void, inbox?: ReturnType<typeof import('../../app/inbox.js').createInbox>, connections?: import('../../app/connections.js').Connections, account?: import('../account-panel.js').Account | null }} ViewCtx
+ * @typedef {{ store: import('../../app/store.js').Store, now: Date, actions: CardActions, add: () => void, goto: (route: string) => void, repaint?: () => void, inbox?: ReturnType<typeof import('../../app/inbox.js').createInbox>, connections?: import('../../app/connections.js').Connections, relay?: import('../../app/relay.js').Relay, account?: import('../account-panel.js').Account | null }} ViewCtx
  */
 
 /** @param {ViewCtx} ctx */
@@ -19,13 +20,7 @@ export function renderToday(ctx) {
   const root = h('div', { class: 'stack-lg' });
 
   if (!events.length) {
-    root.append(
-      h('section', { class: 'empty' },
-        h('h2', null, 'Nothing here yet'),
-        h('p', null, 'Add your first event by speaking, pasting a screenshot, or typing one line. Or bring in your spreadsheet.'),
-        h('div', { class: 'row' },
-          h('button', { class: 'btn btn-primary', type: 'button', onclick: () => ctx.goto('#/capture') }, 'Capture an event'),
-          h('button', { class: 'btn', type: 'button', onclick: () => ctx.goto('#/settings') }, 'Import a spreadsheet'))));
+    root.append(welcome(ctx));
     return root;
   }
 
@@ -62,6 +57,7 @@ export function renderToday(ctx) {
   const parts = [
     section('sec-outcome', 'How did these go?', agenda.needsOutcome, { showDate: true, outcome: true, hint: 'These dates have passed. Mark them so your history stays accurate.' }),
     section('sec-review', 'Check these details', agenda.needsReview.filter((e) => !agenda.needsOutcome.includes(e)), { showDate: true, hint: 'Imported or captured with a guess. Open Edit to confirm the time.' }),
+    section('sec-deadlines', 'Deadlines this week', agenda.deadlines ?? [], { showDate: true, hint: 'Registration or submission closes soon.' }),
     todayEmpty ? h('p', { class: 'muted today-empty' }, 'Nothing scheduled for today.') : null,
     section('sec-today', 'Today', [...agenda.today, ...agenda.todayClosed]),
     section('sec-tomorrow', 'Tomorrow', agenda.tomorrow),

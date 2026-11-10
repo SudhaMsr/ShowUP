@@ -1,4 +1,5 @@
 // @ts-check
+import { effectiveStatus } from '../../domain/opportunity.js';
 import { addDays, localISO, toISO, weekday } from '../../domain/dates.js';
 import { byStart } from '../../domain/event.js';
 import { h } from '../dom.js';
@@ -56,7 +57,7 @@ export function renderCalendar(ctx) {
     },
       h('span', { class: 'cal-num' }, String(Number(d.slice(8)))),
       h('span', { class: 'cal-chips' },
-        list.slice(0, 3).map((e) => h('i', { class: `cal-chip st-${e.status}`, dataset: { type: e.type } }, e.time ? `${e.time} ${e.title}` : e.title)),
+        list.slice(0, 3).map((e) => h('i', { class: `cal-chip st-${effectiveStatus(e)}`, dataset: { type: e.type } }, e.time ? `${e.time} ${e.title}` : e.title)),
         list.length > 3 ? h('em', { class: 'cal-more' }, `+${list.length - 3} more`) : null));
     cell.style.setProperty('--i', String(i));
     return cell;

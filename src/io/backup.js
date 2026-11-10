@@ -11,7 +11,7 @@ const MAX_BACKUP_EVENTS = 50_000;
  * @param {Date} [now]
  */
 export function toBackupJSON(events, now = new Date()) {
-  return JSON.stringify({ app: 'showup', version: 1, exportedAt: now.toISOString(), events }, null, 2);
+  return JSON.stringify({ app: 'showup', version: 2, exportedAt: now.toISOString(), events }, null, 2);
 }
 
 /**
@@ -67,13 +67,13 @@ export function mergeById(existing, incoming) {
   return { merged: [...map.values()], added, updated };
 }
 
-export const CSV_HEADER = ['Date', 'Time', 'Type', 'Title', 'Location', 'Organizer', 'Status', 'Notes', 'Link'];
+export const CSV_HEADER = ['Date', 'Time', 'Type', 'Title', 'Location', 'Organizer', 'Status', 'Notes', 'Link', 'Stage', 'Deadline'];
 
 /** @param {ShowUpEvent[]} events */
 export function toEventsCSV(events) {
   const label = (/** @type {string} */ s) => s.charAt(0).toUpperCase() + s.slice(1);
   return toCSV(
     CSV_HEADER,
-    events.map((e) => [e.date, e.time ?? '', e.type, e.title, e.location, e.organizer, label(e.status), e.notes, e.url]),
+    events.map((e) => [e.date, e.time ?? '', e.type, e.title, e.location, e.organizer, label(e.status), e.notes, e.url, e.stage ?? '', e.deadline ?? '']),
   );
 }

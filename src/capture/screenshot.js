@@ -99,7 +99,7 @@ export async function visionDrafts(blob, cfg) {
   const img = await downscale(blob);
   const prompt = [
     `Today's date is ${cfg.today}. Extract every event from this image (a screenshot or photo of an event registration, ticket, email, flyer or schedule).`,
-    'Reply with ONLY a JSON array. Each item: {"title": string, "type": one of hackathon|meetup|conference|workshop|webinar|interview|meeting|networking|submission|personal|other,',
+    'Reply with ONLY a JSON array. Each item: {"title": string, "type": one of hackathon|internship|scholarship|fellowship|competition|meetup|conference|workshop|webinar|interview|meeting|networking|submission|personal|other (for internships, scholarships and fellowships use the application deadline as the date),',
     '"date": "YYYY-MM-DD" or null, "time": "HH:MM" 24-hour or null, "location": string, "organizer": string, "url": string}.',
     'Do not invent details. If the year is missing choose the next occurrence on or after today. Use null for anything not shown. If there are no events, reply [].',
   ].join(' ');

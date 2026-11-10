@@ -18,6 +18,10 @@ import { findTimeInText } from './time.js';
 const TYPE_RULES = /** @type {Array<[RegExp, string]>} */ ([
   [/\bhack(?:athon|day|fest)\b/i, 'hackathon'],
   [/\b(?:interview|screening call|assessment centre)\b/i, 'interview'],
+  [/\b(?:internship|intern|work placement|placement year|graduate scheme|summer analyst)\b/i, 'internship'],
+  [/\b(?:scholarship|bursary|studentship|grant)\b/i, 'scholarship'],
+  [/\b(?:fellowship)\b/i, 'fellowship'],
+  [/\b(?:competition|contest|olympiad|coding challenge|case challenge)\b/i, 'competition'],
   [/\b(?:conference|summit|expo|symposium|congress|convention|trade ?show)\b/i, 'conference'],
   [/\b(?:webinar|online session|livestream)\b/i, 'webinar'],
   [/\b(?:workshop|bootcamp|masterclass|training|class)\b/i, 'workshop'],

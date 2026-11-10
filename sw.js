@@ -58,6 +58,25 @@ function leaveNote(id, status) {
   });
 }
 
+// Reminders pushed by the optional relay arrive here even when the app is closed.
+self.addEventListener('push', (event) => {
+  /** @type {any} */
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = {};
+  }
+  const title = typeof data.title === 'string' && data.title ? data.title.slice(0, 120) : 'ShowUp reminder';
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: typeof data.body === 'string' ? data.body.slice(0, 300) : '',
+      tag: typeof data.tag === 'string' ? data.tag.slice(0, 100) : undefined,
+      icon: './icons/icon-192.png',
+    }),
+  );
+});
+
 self.addEventListener('notificationclick', (event) => {
   const n = event.notification;
   n.close();
