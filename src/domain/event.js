@@ -1,8 +1,12 @@
 // @ts-check
 import { isValidISO } from './dates.js';
+import {
+  appendStageLog, normalizeStage, sanitizeDetails, sanitizeLinks, sanitizeStageLog, sanitizeTasks,
+} from './opportunity.js';
 
 export const EVENT_TYPES = /** @type {const} */ ([
-  'hackathon', 'meetup', 'conference', 'workshop', 'webinar', 'interview',
+  'hackathon', 'internship', 'scholarship', 'fellowship', 'competition',
+  'meetup', 'conference', 'workshop', 'webinar', 'interview',
   'meeting', 'networking', 'submission', 'personal', 'other',
 ]);
 export const STATUSES = /** @type {const} */ (['upcoming', 'attended', 'missed', 'cancelled']);
@@ -24,6 +28,12 @@ export const SOURCES = /** @type {const} */ (['manual', 'voice', 'screenshot', '
  * @property {string} organizer
  * @property {string} url
  * @property {string} notes
+ * @property {string|null} deadline     registration or submission deadline (YYYY-MM-DD), pipeline types only
+ * @property {string|null} stage        application stage, or null for plain events
+ * @property {import('./opportunity.js').StageLogEntry[]} stageLog
+ * @property {Record<string,string>} details   typed fields (prize, pay, amount...)
+ * @property {import('./opportunity.js').Link[]} links
+ * @property {import('./opportunity.js').Task[]} tasks
  * @property {EventStatus} status
  * @property {number[]|null} reminders  minutes before start; null = defaults
  * @property {EventSource} source
@@ -32,7 +42,7 @@ export const SOURCES = /** @type {const} */ (['manual', 'voice', 'screenshot', '
  * @property {string} updatedAt
  */
 
-export const LIMITS = { title: 200, location: 200, organizer: 200, notes: 2000, url: 2000 };
+export const LIMITS = { title: 200, location: 200, organizer: 200, notes: 10000, url: 2000 };
 
 /** @returns {string} */
 export function newId() {
@@ -85,10 +95,13 @@ export function normalizeEvent(input, opts = {}) {
   const reminders = Array.isArray(input.reminders)
     ? [...new Set(input.reminders.filter((n) => Number.isInteger(n) && n >= 0 && n <= 60 * 24 * 30))].sort((a, b) => b - a)
     : null;
+  const type = oneOf(EVENT_TYPES, input.type, 'other');
+  const stage = normalizeStage(type, input.stage);
+  const deadline = typeof input.deadline === 'string' && isValidISO(input.deadline) && stage !== null ? input.deadline : null;
   return {
     id: typeof input.id === 'string' && input.id ? input.id.slice(0, 100) : opts.id ?? newId(),
     title: text(input.title, LIMITS.title),
-    type: oneOf(EVENT_TYPES, input.type, 'other'),
+    type,
     date: typeof input.date === 'string' ? input.date : '',
     time: hm(input.time),
     endTime: hm(input.endTime),
@@ -96,6 +109,12 @@ export function normalizeEvent(input, opts = {}) {
     organizer: text(input.organizer, LIMITS.organizer),
     url: text(input.url, LIMITS.url),
     notes: text(input.notes, LIMITS.notes),
+    deadline,
+    stage,
+    stageLog: stage === null ? [] : sanitizeStageLog(input.stageLog, type),
+    details: sanitizeDetails(type, input.details),
+    links: sanitizeLinks(input.links),
+    tasks: sanitizeTasks(input.tasks),
     status: oneOf(STATUSES, input.status, 'upcoming'),
     reminders,
     source: oneOf(SOURCES, input.source, 'manual'),
@@ -114,6 +133,7 @@ export function validate(e) {
   const errors = {};
   if (!e.title) errors.title = 'Give the event a title.';
   if (!isValidISO(e.date)) errors.date = 'Pick a real date.';
+  if (e.deadline && !isValidISO(e.deadline)) errors.deadline = 'Pick a real deadline date.';
   if (e.endTime && !e.time) errors.endTime = 'Add a start time before an end time.';
   if (e.time && e.endTime && e.endTime <= e.time) errors.endTime = 'End time must be after the start time.';
   if (e.url) {
@@ -125,6 +145,17 @@ export function validate(e) {
     }
   }
   return { ok: Object.keys(errors).length === 0, errors };
+}
+
+/**
+ * Move an event to a stage, logging the change. No-op for types without a pipeline.
+ * @param {ShowUpEvent} e @param {string} stage @param {Date} now
+ * @returns {ShowUpEvent}
+ */
+export function withStage(e, stage, now) {
+  const next = normalizeStage(e.type, stage);
+  if (next === null || next === e.stage) return e;
+  return { ...e, stage: next, stageLog: appendStageLog(e.stageLog, next, now.toISOString()) };
 }
 
 /** Stable key for duplicate detection. @param {Pick<ShowUpEvent,'title'|'date'|'time'>} e */

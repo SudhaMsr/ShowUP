@@ -4,6 +4,7 @@ import { eventsInWeek, overall, weeklyStats } from '../../domain/stats.js';
 import { h, s } from '../dom.js';
 import { countUp } from '../motion.js';
 import { dayLabel, time12, TYPE_LABEL } from '../format.js';
+import { effectiveStatus, opportunityStats, STAGE_IDS } from '../../domain/opportunity.js';
 
 /** @typedef {import('./today.js').ViewCtx} ViewCtx */
 
@@ -40,6 +41,39 @@ function stat(label, n, cls, hint) {
   return h('div', { class: `stat ${cls}` }, num, h('span', { class: 'stat-label' }, label), hint ? h('small', {}, hint) : null);
 }
 
+const STAGE_NAME = /** @type {Record<string,string>} */ ({ found: 'Found', registered: 'Registered', working: 'Preparing', submitted: 'Applied / submitted', interview: 'Interview', won: 'Offer / won', lost: 'Not selected', closed: 'Dropped' });
+
+/** Opportunity funnel: how much you found, how much you finished, how it turned out. @param {ReturnType<typeof opportunityStats>} opp @param {Date} now */
+function opportunitiesPanel(opp, now) {
+  const top = Math.max(1, ...Object.values(opp.byStage));
+  const pctText = (/** @type {number|null} */ v) => (v === null ? 'n/a' : `${v}%`);
+  return h('section', { class: 'panel', id: 'opp-panel' },
+    h('h2', {}, 'Opportunities'),
+    h('p', { class: 'muted' }, 'Follow-through is how many of the chances you could act on you actually submitted. That is the number to grow.'),
+    h('div', { class: 'stats-grid' },
+      stat('Tracked', opp.total, 'st-s'),
+      stat('Submitted', opp.applied, 'st-a'),
+      stat('Deadlines missed', opp.missed, 'st-m'),
+      stat('Won / offers', opp.won, 'st-r')),
+    h('p', { class: 'stats-hint' }, `Follow-through ${pctText(opp.followThrough)} · Win rate ${pctText(opp.winRate)}`),
+    h('div', { class: 'bt' }, STAGE_IDS.filter((id) => opp.byStage[id] > 0).map((id, i) => {
+      const bar = h('span', { class: 'bt-fill', dataset: { stage: id } });
+      bar.style.setProperty('--w', `${Math.round((opp.byStage[id] / top) * 100)}%`);
+      bar.style.setProperty('--i', String(i));
+      return h('div', { class: 'bt-row' }, h('span', { class: 'bt-name' }, STAGE_NAME[id]), h('span', { class: 'bt-bar' }, bar), h('span', { class: 'bt-val' }, String(opp.byStage[id])));
+    })),
+    opp.dueSoon.length
+      ? h('div', null,
+          h('h3', {}, 'Closing soonest'),
+          h('ul', { class: 'wk-list' }, opp.dueSoon.slice(0, 5).map(({ event, deadline }) =>
+            h('li', { class: 'wk-item', dataset: { type: event.type } },
+              h('span', { class: 'wk-when' }, dayLabel(deadline, now)),
+              h('span', { class: 'wk-title' }, event.title),
+              h('span', { class: 'wk-status' }, STAGE_NAME[event.stage ?? 'found'])))))
+      : null,
+    opp.toReview ? h('p', { class: 'muted' }, `${opp.toReview} past deadline and still not marked. Check Today.`) : null);
+}
+
 /** @param {ViewCtx} ctx */
 export function renderInsights(ctx) {
   const { store, now } = ctx;
@@ -47,12 +81,14 @@ export function renderInsights(ctx) {
   const today = localISO(now);
   const all = overall(events, today);
   const root = h('div', { class: 'stack-lg insights' });
+  const opp = opportunityStats(events, today);
 
   if (!all.attended && !all.missed && !all.cancelled) {
     root.append(h('div', { class: 'empty' },
       h('h2', {}, 'Your stats start with your first event'),
       h('p', { class: 'muted' }, 'When an event ends, ShowUp asks how it went. Say “I went” or “I missed it” and your weekly success rate shows up here.'),
       h('button', { class: 'btn btn-primary', type: 'button', onclick: () => ctx.goto('#/capture') }, 'Capture an event')));
+    if (opp.total) root.append(opportunitiesPanel(opp, now));
     return root;
   }
 
@@ -96,11 +132,11 @@ export function renderInsights(ctx) {
           h('span', { class: 'pill p-rate' }, selected.rate === null ? 'No rate yet' : `${selected.rate}% success`))),
       picked.length
         ? h('ul', { class: 'wk-list' }, picked.map((e) =>
-            h('li', { class: `wk-item st-${e.status}`, dataset: { type: e.type } },
+            h('li', { class: `wk-item st-${effectiveStatus(e)}`, dataset: { type: e.type } },
               h('span', { class: 'wk-dot', 'aria-hidden': 'true' }),
               h('span', { class: 'wk-when' }, `${dayLabel(e.date, now)}${e.time ? ` · ${time12(e.time)}` : ''}`),
               h('span', { class: 'wk-title' }, e.title),
-              h('span', { class: 'wk-status' }, e.status === 'upcoming' && e.date < today ? 'to review' : e.status))))
+              h('span', { class: 'wk-status' }, effectiveStatus(e) === 'upcoming' && e.date < today ? 'to review' : effectiveStatus(e)))))
         : h('p', { class: 'muted' }, 'No events this week.'));
 
     const spanSwitch = h('div', { class: 'seg-switch', role: 'group', 'aria-label': 'Weeks shown' },
@@ -131,7 +167,8 @@ export function renderInsights(ctx) {
         h('div', { class: 'chart-head' }, h('h2', {}, 'Week by week'), spanSwitch),
         chart, legend),
       detail,
-      byType);
+      byType,
+      ...(opp.total ? [opportunitiesPanel(opp, now)] : []));
   };
   paint();
   root.append(body);

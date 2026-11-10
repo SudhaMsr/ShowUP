@@ -1,11 +1,12 @@
 // @ts-check
 import { addDays, diffDays, localISO } from './dates.js';
 import { byStart } from './event.js';
+import { DEADLINE_DAYS, deadlineOf, hasPipeline, isApplicationType, isOpen, PRE_SUBMIT_STAGES } from './opportunity.js';
 
 /**
  * @typedef {import('./event.js').ShowUpEvent} ShowUpEvent
  * @typedef {{ reminderOffsets: number[], allDayReminderHour: number }} ReminderSettings
- * @typedef {{ key: string, eventId: string, at: Date, offset: number }} Reminder
+ * @typedef {{ key: string, eventId: string, at: Date, offset: number, kind: 'start'|'deadline' }} Reminder
  */
 
 /** @type {ReminderSettings} */
@@ -36,7 +37,8 @@ export function startDate(e, allDayHour = 9) {
 export function reminderSchedule(e, settings = DEFAULT_REMINDER_SETTINGS) {
   const offsets = e.reminders ?? settings.reminderOffsets;
   const start = startDate(e, settings.allDayReminderHour);
-  return offsets.map((offset) => {
+  /** @type {Reminder[]} */
+  const out = offsets.map((offset) => {
     let at;
     if (offset > 0 && offset % 1440 === 0) {
       // "1 day before" means the same wall-clock time on the previous calendar day,
@@ -46,7 +48,29 @@ export function reminderSchedule(e, settings = DEFAULT_REMINDER_SETTINGS) {
     } else {
       at = new Date(start.getTime() - offset * 60_000);
     }
-    return { key: `${e.id}:${offset}`, eventId: e.id, at, offset };
+    return { key: `${e.id}:${offset}`, eventId: e.id, at, offset, kind: /** @type {const} */ ('start') };
+  });
+  return [...out, ...deadlineReminders(e, settings)];
+}
+
+/**
+ * Nudges 3 days, 1 day and (for competitions) the morning of a deadline, while
+ * the work is not yet submitted. Applications already remind on their own date
+ * (which is the deadline), so the "morning of" nudge is left to the usual ones.
+ * Respects "no reminders" (an empty list on the event).
+ * @param {ShowUpEvent} e
+ * @param {ReminderSettings} settings
+ * @returns {Reminder[]}
+ */
+export function deadlineReminders(e, settings = DEFAULT_REMINDER_SETTINGS) {
+  const dl = deadlineOf(e);
+  if (!dl || !hasPipeline(e.type) || !e.stage || !PRE_SUBMIT_STAGES.includes(e.stage)) return [];
+  if (e.reminders !== null && e.reminders.length === 0) return [];
+  const days = isApplicationType(e.type) ? DEADLINE_DAYS.filter((d) => d > 0) : DEADLINE_DAYS;
+  return days.map((n) => {
+    const [y, m, d] = dl.split('-').map(Number);
+    const at = new Date(y, m - 1, d - n, settings.allDayReminderHour, 0, 0, 0);
+    return { key: `${e.id}:dl${n}`, eventId: e.id, at, offset: n * 1440, kind: /** @type {const} */ ('deadline') };
   });
 }
 
@@ -63,10 +87,11 @@ export function dueReminders(events, settings, from, to) {
   /** @type {Array<Reminder & { event: ShowUpEvent }>} */
   const out = [];
   for (const event of events) {
-    if (event.status !== 'upcoming') continue;
+    if (!isOpen(event)) continue;
     const startMs = startDate(event, settings.allDayReminderHour).getTime();
-    if (startMs <= from.getTime()) continue; // already started before the window
+    const started = startMs <= from.getTime(); // already started before the window
     for (const r of reminderSchedule(event, settings)) {
+      if (started && r.kind === 'start') continue;
       if (r.at > from && r.at <= to) out.push({ ...r, event });
     }
   }
@@ -142,7 +167,7 @@ export function dueFollowUps(events, from, to) {
   /** @type {Array<{ key: string, at: Date, event: ShowUpEvent }>} */
   const out = [];
   for (const event of events) {
-    if (event.status !== 'upcoming') continue;
+    if (!isOpen(event)) continue;
     const at = followUpAt(event);
     if (at > from && at <= to) out.push({ key: `${event.id}:after`, at, event });
   }
@@ -161,7 +186,7 @@ export function nextWakeAt(events, settings, now) {
     if (t > now && (!best || t < best)) best = t;
   };
   for (const e of events) {
-    if (e.status !== 'upcoming') continue;
+    if (!isOpen(e)) continue;
     for (const r of reminderSchedule(e, settings)) consider(r.at);
     consider(followUpAt(e));
   }
@@ -177,7 +202,7 @@ export function nextUp(events, now) {
   const today = localISO(now);
   const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   const candidates = events
-    .filter((e) => e.status === 'upcoming' && (e.date > today || (e.date === today && (e.time === null || e.time >= hhmm || (e.endTime !== null && e.endTime > hhmm)))))
+    .filter((e) => isOpen(e) && (e.date > today || (e.date === today && (e.time === null || e.time >= hhmm || (e.endTime !== null && e.endTime > hhmm)))))
     .sort(byStart);
   return candidates[0] ?? null;
 }
@@ -219,17 +244,25 @@ export function buildAgenda(events, now) {
   const tomorrow = addDays(today, 1);
   const weekEnd = addDays(today, 7);
   const sorted = [...events].sort(byStart);
-  const open = sorted.filter((e) => e.status === 'upcoming');
+  const open = sorted.filter(isOpen);
   return {
     today: open.filter((e) => e.date === today),
     // Today's events already marked attended/missed/cancelled stay visible (dimmed)
     // so a mis-tap can be undone and the day still reads as a complete record.
-    todayClosed: sorted.filter((e) => e.date === today && e.status !== 'upcoming'),
+    todayClosed: sorted.filter((e) => e.date === today && !isOpen(e)),
     tomorrow: open.filter((e) => e.date === tomorrow),
     thisWeek: open.filter((e) => e.date > tomorrow && e.date <= weekEnd),
     later: open.filter((e) => e.date > weekEnd),
     // Past events still marked upcoming: user should confirm attended/missed.
     needsOutcome: open.filter((e) => e.date < today),
-    needsReview: sorted.filter((e) => e.needsReview && e.status === 'upcoming'),
+    needsReview: sorted.filter((e) => e.needsReview && isOpen(e)),
+    // Competitions whose registration/submission deadline falls this week (the
+    // event itself is later). Applications already show on their own date.
+    deadlines: open
+      .filter((e) => {
+        const dl = deadlineOf(e);
+        return dl !== null && dl !== e.date && !isApplicationType(e.type) && e.stage !== null && PRE_SUBMIT_STAGES.includes(e.stage) && dl >= today && dl <= weekEnd;
+      })
+      .sort((a, b) => (deadlineOf(a) ?? '').localeCompare(deadlineOf(b) ?? '')),
   };
 }

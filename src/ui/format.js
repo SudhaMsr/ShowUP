@@ -52,7 +52,7 @@ export function safeHref(url) {
 }
 
 export const TYPE_LABEL = /** @type {Record<string,string>} */ ({
-  hackathon: 'Hackathon', meetup: 'Meetup', conference: 'Conference', workshop: 'Workshop',
+  hackathon: 'Hackathon', internship: 'Internship', scholarship: 'Scholarship', fellowship: 'Fellowship', competition: 'Competition', meetup: 'Meetup', conference: 'Conference', workshop: 'Workshop',
   webinar: 'Webinar', interview: 'Interview', meeting: 'Meeting', networking: 'Networking',
   submission: 'Submission', personal: 'Personal', other: 'Other',
 });

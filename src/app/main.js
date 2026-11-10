@@ -6,6 +6,7 @@ import { createStore } from './store.js';
 import { createInbox } from './inbox.js';
 import { createGoogle } from './google.js';
 import { createConnections } from './connections.js';
+import { createRelay } from './relay.js';
 import { renderInbox } from '../ui/views/inbox.js';
 import { createAuth } from './auth.js';
 import { authSupported, deleteDatabases, idbAuthStorage } from './auth-storage.js';
@@ -28,6 +29,7 @@ import { renderCalendar } from '../ui/views/calendar.js';
 import { renderCapture } from '../ui/views/capture.js';
 import { renderSettings } from '../ui/views/settings.js';
 import { time12 } from '../ui/format.js';
+import { effectiveStatus, isApplicationType, isOpen, stageLabel } from '../domain/opportunity.js';
 
 const ROUTES = /** @type {Record<string, { title: string, render: (ctx: any) => HTMLElement }>} */ ({
   '#/today': { title: 'Today', render: renderToday },
@@ -93,7 +95,20 @@ async function run(repo, account) {
     setStatus: async (e, status) => {
       await store.setStatus(e.id, status);
       if (status === 'attended') confetti();
-      toast(status === 'attended' ? 'Marked as attended.' : status === 'missed' ? 'Marked as missed.' : status === 'cancelled' ? 'Marked as cancelled.' : 'Moved back to upcoming.');
+      const app = isApplicationType(e.type);
+      toast(status === 'attended' ? (app ? 'Marked as applied. Well done!' : 'Marked as attended.')
+        : status === 'missed' ? (app ? 'Marked as a missed deadline.' : 'Marked as missed.')
+        : status === 'cancelled' ? (app ? 'Marked as not pursuing.' : 'Marked as cancelled.')
+        : 'Moved back to upcoming.');
+    },
+    setStage: async (e, stage) => {
+      const res = await store.setStage(e.id, stage);
+      if (!res.ok) return toast(Object.values(res.errors)[0] ?? 'Could not change the stage.', { kind: 'error' });
+      if (stage === 'won') confetti();
+      toast(`${e.title}: ${stageLabel(e.type, stage)}.`);
+    },
+    setTask: async (e, index, done) => {
+      await store.setTask(e.id, index, done);
     },
     remove: async (e) => {
       if (await confirmDialog('Delete this event?', `“${e.title}” will be removed from this browser.`, 'Delete')) {
@@ -101,7 +116,7 @@ async function run(repo, account) {
         toast('Event deleted.');
       }
     },
-    duplicate: (e) => openEditor(store, null, { defaults: { ...e, id: undefined, status: 'upcoming', needsReview: false, firedReminders: undefined } }),
+    duplicate: (e) => openEditor(store, null, { defaults: { ...e, id: undefined, status: 'upcoming', stage: undefined, stageLog: undefined, tasks: e.tasks.map((t) => ({ ...t, done: false })), needsReview: false, firedReminders: undefined } }),
     downloadIcs: (e) => {
       download(`${e.title.replace(/[^\w-]+/g, '-').slice(0, 40) || 'event'}.ics`, toICS([e], { settings: store.getState().settings }), 'text/calendar;charset=utf-8');
       toast('Calendar file downloaded. Open it to add the event with its reminders.');
@@ -118,11 +133,14 @@ async function run(repo, account) {
     }
   };
   const connections = createConnections({ repo, store, inbox, google: createGoogle(), onFound });
+  const relay = createRelay({ repo, store });
+  relay.start();
 
   const ctx = {
     store,
     inbox,
     connections,
+    relay,
     account,
     actions,
     repaint: () => paint(),
@@ -150,6 +168,7 @@ async function run(repo, account) {
       else a.removeAttribute('aria-current');
     }
     document.title = `${def.title} · ShowUp`;
+    view.classList.remove('welcome-page');
     setChildren(view, h('h1', { class: 'page-title', id: 'page-title' }, def.title), def.render(ctx));
     if (moveFocus) view.focus({ preventScroll: true });
   }
@@ -194,7 +213,7 @@ async function run(repo, account) {
   /** @param {string} id @param {'attended'|'missed'|'cancelled'} status */
   async function applyOutcome(id, status) {
     const e = store.getState().events.find((x) => x.id === id);
-    if (!e || e.status !== 'upcoming') return;
+    if (!e || !isOpen(e)) return;
     await store.setStatus(id, status);
     if (status === 'attended') confetti();
     toast(`${e.title}: ${OUTCOME_TOAST[status]}`);
@@ -212,7 +231,7 @@ async function run(repo, account) {
         }
         const id = /** @type {string} */ (outcomeQueue.shift());
         const e = store.getState().events.find((x) => x.id === id);
-        if (!e || e.status !== 'upcoming') continue;
+        if (!e || !isOpen(e)) continue;
         const answer = await askOutcome(e, { remaining: outcomeQueue.length });
         if (answer !== 'later') await applyOutcome(id, answer);
       }
@@ -238,8 +257,11 @@ async function run(repo, account) {
   // ---- Reminders ----
   const engine = createReminderEngine(store, {
     live: async (r) => {
-      const when = r.event.time ? time12(r.event.time) : 'today';
-      const body = `${when}${r.event.location ? ` · ${r.event.location}` : ''} (${describeOffset(r.offset)})`;
+      const isDeadline = r.kind === 'deadline';
+      const when = isDeadline ? 'Deadline' : r.event.time ? time12(r.event.time) : 'today';
+      const body = isDeadline
+        ? `Deadline ${r.offset === 0 ? 'today' : `in ${r.offset / 1440} day${r.offset === 1440 ? '' : 's'}`}${r.event.stage ? ` · ${stageLabel(r.event.type, r.event.stage)}` : ''}`
+        : `${when}${r.event.location ? ` · ${r.event.location}` : ''} (${describeOffset(r.offset)})`;
       toast(`${r.event.title}: ${body}`, { ms: 15000 });
       await showSystemNotification({ title: r.event.title, body, tag: r.key });
     },
@@ -326,7 +348,7 @@ async function run(repo, account) {
       { id: 'theme', label: 'Toggle light / dark theme', hint: 'Appearance', run: () => toggleTheme() },
     ];
     if (account) cmds.push({ id: 'lock', label: 'Lock ShowUp', hint: 'Security', run: () => account.lock() });
-    for (const e of store.getState().events.slice(0, 300)) cmds.push({ id: e.id, label: e.title, hint: `${e.date} · ${e.status}`, run: () => openEditor(store, e) });
+    for (const e of store.getState().events.slice(0, 300)) cmds.push({ id: e.id, label: e.title, hint: `${e.date} · ${e.stage ? stageLabel(e.type, e.stage) : effectiveStatus(e)}`, run: () => openEditor(store, e) });
     return cmds;
   });
   byId('palette-btn').addEventListener('click', () => openPalette());

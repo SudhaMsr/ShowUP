@@ -21,6 +21,8 @@ const HEADER_ALIASES = /** @type {Record<string,string>} */ ({
   status: 'status', state: 'status',
   notes: 'notes', note: 'notes', comments: 'notes', description: 'notes',
   link: 'url', url: 'url', website: 'url',
+  stage: 'stage', progress: 'stage', 'application status': 'stage',
+  deadline: 'deadline', 'due date': 'deadline', due: 'deadline', 'apply by': 'deadline', 'closing date': 'deadline',
 });
 
 /** @param {unknown} v */
@@ -54,10 +56,25 @@ function mapStatus(raw) {
   return 'upcoming';
 }
 
+/** Spreadsheet wording for a stage -> stage id (unknown wording gives '' so the default applies). @param {string} raw */
+function mapStage(raw) {
+  const s = raw.toLowerCase();
+  if (!s) return '';
+  if (/(offer|accepted|awarded|won|winner|placed|selected)/.test(s)) return 'won';
+  if (/(reject|declined|unsuccessful|not selected|not awarded|lost)/.test(s)) return 'lost';
+  if (/(withdr|dropped|not applying|abandon)/.test(s)) return 'closed';
+  if (/interview/.test(s)) return 'interview';
+  if (/(submitted|applied|sent)/.test(s)) return 'submitted';
+  if (/(preparing|working|building|drafting|in progress)/.test(s)) return 'working';
+  if (/(registered|signed up)/.test(s)) return 'registered';
+  if (/(found|saved|interested|to apply|todo|to do)/.test(s)) return 'found';
+  return '';
+}
+
 /** @param {string} raw @param {string} title */
 function mapType(raw, title) {
   const s = raw.toLowerCase();
-  const direct = ['hackathon', 'meetup', 'conference', 'workshop', 'webinar', 'interview', 'meeting', 'networking', 'submission', 'personal'];
+  const direct = ['hackathon', 'internship', 'scholarship', 'fellowship', 'competition', 'meetup', 'conference', 'workshop', 'webinar', 'interview', 'meeting', 'networking', 'submission', 'personal'];
   const hit = direct.find((d) => s.includes(d));
   if (hit) return hit;
   if (/friends|outing|volunteer|trip|party/.test(s)) return 'personal';
@@ -150,6 +167,8 @@ export function mapSheet(rows, opts = {}) {
         location: str(cell(r, 'location')),
         organizer: str(cell(r, 'organizer')),
         status: mapStatus(str(cell(r, 'status'))),
+        stage: mapStage(str(cell(r, 'stage')) || str(cell(r, 'status'))),
+        deadline: readDate(cell(r, 'deadline'), ref).date,
         notes: [str(cell(r, 'notes')), t.time === null && rawTime && !t.flexible && !/^(na|n\/a)$/i.test(rawTime) ? `Original time: ${rawTime}` : '']
           .filter(Boolean)
           .join('\n'),

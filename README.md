@@ -70,3 +70,13 @@ Pushing to `main` runs type checks, unit tests and browser tests, then publishes
 ## Licence
 
 MIT
+
+
+## Opportunities, stages and the reminder relay
+
+* Track hackathons, internships, scholarships, fellowships and competitions through stages
+  (Found, Preparing, Applied, Interview, Offer), with typed fields, a checklist, links and notes.
+* Deadline reminders (3 days, 1 day, the morning of) stop once you submit. Insights shows follow-through and win rate.
+* Optional: `server/` is a zero-dependency relay that pushes reminders to ntfy, Telegram, email, a webhook or
+  Web Push while the app is closed. See `server/README.md`. Build the page with `SHOWUP_RELAY_ORIGINS` set to allow it.
+* `python3 scripts/make-hero-video.py` regenerates the welcome-screen demo (needs Pillow and ffmpeg).

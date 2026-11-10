@@ -4,7 +4,7 @@ import { dueFollowUps, dueReminders, FOLLOW_UP_MAX_AGE_MS, nextWakeAt } from '..
 /**
  * @typedef {import('./store.js').Store} Store
  * @typedef {import('../domain/event.js').ShowUpEvent} ShowUpEvent
- * @typedef {{ key: string, at: Date, offset: number, event: ShowUpEvent }} Fired
+ * @typedef {{ key: string, at: Date, offset: number, kind: 'start'|'deadline', event: ShowUpEvent }} Fired
  * @typedef {{ key: string, at: Date, event: ShowUpEvent }} FollowUp
  * @typedef {Object} Notifier
  * @property {(reminder: Fired) => void | Promise<void>} live      a reminder happening now

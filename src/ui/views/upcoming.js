@@ -2,6 +2,7 @@
 import { EVENT_TYPES, byStart } from '../../domain/event.js';
 import { h } from '../dom.js';
 import { eventCard } from '../event-card.js';
+import { isOpen } from '../../domain/opportunity.js';
 import { dayHeading, monthLabel, TYPE_LABEL } from '../format.js';
 
 /**
@@ -14,11 +15,11 @@ const filters = { q: '', type: 'all', scope: 'upcoming' };
 
 /** @param {import('../../domain/event.js').ShowUpEvent} e @param {Filters} f @param {string} today */
 function matches(e, f, today) {
-  if (f.scope === 'upcoming' && !(e.status === 'upcoming')) return false;
-  if (f.scope === 'history' && e.status === 'upcoming' && e.date >= today) return false;
+  if (f.scope === 'upcoming' && !isOpen(e)) return false;
+  if (f.scope === 'history' && isOpen(e) && e.date >= today) return false;
   if (f.type !== 'all' && e.type !== f.type) return false;
   if (f.q) {
-    const hay = `${e.title} ${e.location} ${e.organizer} ${e.notes}`.toLowerCase();
+    const hay = `${e.title} ${e.location} ${e.organizer} ${e.notes} ${Object.values(e.details ?? {}).join(' ')}`.toLowerCase();
     if (!f.q.toLowerCase().split(/\s+/).every((w) => hay.includes(w))) return false;
   }
   return true;
@@ -54,7 +55,7 @@ export function renderUpcoming(ctx) {
           ...[...days].map(([date, list]) =>
             h('div', { class: 'day' },
               h('h3', { class: 'day-title' }, dayHeading(date, now)),
-              h('div', { class: 'list' }, list.map((e) => eventCard(e, { now, actions, outcome: e.status === 'upcoming' && e.date < today })))))));
+              h('div', { class: 'list' }, list.map((e) => eventCard(e, { now, actions, outcome: isOpen(e) && e.date < today })))))));
     }
   }
 

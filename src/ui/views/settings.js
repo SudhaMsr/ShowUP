@@ -1,4 +1,5 @@
 // @ts-check
+import { isOpen } from '../../domain/opportunity.js';
 import { toICS } from '../../domain/ics.js';
 import { toBackupJSON, toEventsCSV } from '../../io/backup.js';
 import { notificationState, requestNotificationPermission, showSystemNotification } from '../../app/notify.js';
@@ -6,6 +7,7 @@ import { confirmDialog, download, h, toast } from '../dom.js';
 import { importPanel } from '../import-panel.js';
 import { accountPanel } from '../account-panel.js';
 import { connectionsPanel } from '../connections-panel.js';
+import { relayPanel } from '../relay-panel.js';
 import { offsetsEditor } from '../offsets-editor.js';
 
 /** @typedef {import('./today.js').ViewCtx} ViewCtx */
@@ -51,7 +53,7 @@ export function renderSettings(ctx) {
   // ---- Calendar export ----
   const exportIcs = h('button', { class: 'btn', type: 'button', id: 'export-ics' }, 'Download calendar file (.ics)');
   exportIcs.addEventListener('click', () => {
-    const upcoming = store.getState().events.filter((e) => e.status === 'upcoming');
+    const upcoming = store.getState().events.filter((e) => isOpen(e));
     if (!upcoming.length) return toast('No upcoming events to export.', { kind: 'error' });
     download('showup-events.ics', toICS(upcoming, { settings: store.getState().settings, name: 'ShowUp events' }), 'text/calendar;charset=utf-8');
     toast(`Exported ${upcoming.length} events with reminders.`);
@@ -94,6 +96,7 @@ export function renderSettings(ctx) {
     persistent ? null : h('p', { class: 'banner banner-warn', role: 'alert' }, 'Your browser is blocking storage, so events will be lost when you close this tab. Check private-browsing or site-data settings.'),
     accountPanel(ctx),
     connectionsPanel(ctx),
+    relayPanel(ctx),
     h('section', { class: 'panel', 'aria-labelledby': 's-rem' },
       h('h2', { id: 's-rem' }, 'Reminders'),
       h('p', { class: 'muted' }, 'Tap the times you want a nudge before every event. Add your own too.'),
@@ -111,7 +114,7 @@ export function renderSettings(ctx) {
       importPanel(ctx), wipe),
     h('section', { class: 'panel', 'aria-labelledby': 's-about' },
       h('h2', { id: 's-about' }, 'Privacy'),
-      h('p', { class: 'muted' }, 'No tracking and no server. Your sign-in lives only on this device. Your events never leave this browser unless you export them or use your own AI key for a screenshot.')),
+      h('p', { class: 'muted' }, 'No tracking and no server of ours. Your sign-in lives only on this device. Your events never leave this browser unless you export them, use your own AI key for a screenshot, or switch on a reminder relay that you host.')),
     h('details', { class: 'panel adv' },
       h('summary', {}, 'Advanced: AI screenshot reading (optional, not needed for Excel)'),
       h('div', { class: 'stack' },
