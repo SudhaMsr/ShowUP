@@ -32,7 +32,7 @@ test('login: create account, data is encrypted at rest, lock, wrong password, un
   const page = await newPage(browser);
   await page.goto(server.url);
   await page.waitForSelector('#auth-form');
-  assert.match(await page.textContent('h1'), /Create your space/);
+  assert.match(await page.textContent('#auth-form .auth-title'), /Create your space/);
 
   // validation
   await page.fill('#auth-name', 'Sudha');
@@ -111,7 +111,7 @@ test('login: lockout after repeated wrong passwords; forgot password erases and 
   await page.fill('#forgot-confirm', 'erase');
   await page.click('#forgot-submit');
   await page.waitForSelector('#auth-name');
-  assert.match(await page.textContent('h1'), /Create your space/);
+  assert.match(await page.textContent('#auth-form .auth-title'), /Create your space/);
   page.assertClean(IGNORE);
 });
 
