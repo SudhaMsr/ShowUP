@@ -17,6 +17,7 @@ cpSync(join(root, 'src'), join(dist, 'src'), { recursive: true });
 cpSync(join(root, 'styles'), join(dist, 'styles'), { recursive: true });
 cpSync(join(root, 'public', 'icons'), join(dist, 'icons'), { recursive: true });
 cpSync(join(root, 'public', 'media'), join(dist, 'media'), { recursive: true });
+cpSync(join(root, 'public', 'vendor'), join(dist, 'vendor'), { recursive: true });
 writeFileSync(join(dist, '.nojekyll'), '');
 
 // Optional reminder relays the app may talk to. The page's Content-Security-Policy only allows

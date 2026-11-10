@@ -965,3 +965,43 @@ nav::-webkit-scrollbar { display: none; }
 @keyframes lp-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -10px; } }
 @media (max-width: 700px) { .lp-scene { height: 250px; } .lp-3d { width: 46%; } .lp-3d-2 { left: 27%; } .lp-3d-4 { display: none; } .lp-3d-1 { top: 70px; } .lp-3d-3 { top: 80px; } }
 @media (prefers-reduced-motion: reduce) { .lp-3d-card { animation: none; } .lp-3d { transition: none; } }
+
+/* ---- Hype hero: navy stage, gold marker, word-rise reveal (palette from the motion kit) ---- */
+.lp-hero.lp-dark { --gold: #f5c542; max-width: none; position: relative; overflow: hidden; isolation: isolate; padding-bottom: 0; color: #fff;
+  background: radial-gradient(ellipse 70% 55% at 50% 38%, #1b2d68 0%, #0d1531 55%, #080f26 100%); }
+.lp-hero.lp-dark::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(circle at 18% 22%, rgba(245, 197, 66, .16), transparent 32%), radial-gradient(circle at 84% 70%, rgba(77, 163, 255, .14), transparent 36%); animation: lp-glow 9s ease-in-out infinite alternate; }
+.lp-hero.lp-dark::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; box-shadow: inset 0 0 160px 40px rgba(4, 8, 22, .75); }
+@keyframes lp-glow { from { transform: translate3d(-1.5%, 0, 0) scale(1); } to { transform: translate3d(1.5%, -1.5%, 0) scale(1.06); } }
+.lp-dark .lp-title { animation: none; max-width: 15ch; color: #fff; }
+.lp-dark .lp-w { display: inline-block; opacity: 0; transform: translateY(40px); animation: lp-rise .5s cubic-bezier(.2, .7, .2, 1) forwards; }
+.lp-dark .lp-w:nth-child(1) { animation-delay: .05s; } .lp-dark .lp-w:nth-child(2) { animation-delay: .13s; } .lp-dark .lp-w:nth-child(3) { animation-delay: .21s; }
+.lp-dark .lp-w:nth-child(4) { animation-delay: .29s; } .lp-dark .lp-w:nth-child(5) { animation-delay: .37s; } .lp-dark .lp-w:nth-child(6) { animation-delay: .45s; } .lp-dark .lp-w:nth-child(7) { animation-delay: .53s; }
+@keyframes lp-rise { to { opacity: 1; transform: none; } }
+.lp-dark .lp-mark { position: relative; z-index: 0; color: #0d1531; padding: 0 .16em; }
+.lp-dark .lp-mark::before { content: ""; position: absolute; inset: .08em 0 .02em; z-index: -1; border-radius: .14em; background: var(--gold); transform: scaleX(0); transform-origin: left; animation: lp-marker .5s .95s cubic-bezier(.2, .7, .2, 1) forwards; }
+@keyframes lp-marker { to { transform: scaleX(1); } }
+.lp-dark .lp-sub { color: #c7d0ee; animation-delay: .9s; }
+.lp-dark .lp-cta { animation-delay: 1.05s; }
+.lp-dark .btn-primary { background: var(--gold); border-color: var(--gold); color: #0d1531; font-weight: 700; box-shadow: 0 0 0 0 rgba(245, 197, 66, .5); animation: lp-pulse 2.6s 2s ease-out infinite; }
+.lp-dark .btn-primary:hover { background: #ffd45e; }
+@keyframes lp-pulse { 0% { box-shadow: 0 0 0 0 rgba(245, 197, 66, .45); } 70%, 100% { box-shadow: 0 0 0 16px rgba(245, 197, 66, 0); } }
+.lp-dark .lp-btn-soft { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .22); color: #fff; }
+.lp-dark .lp-btn-soft:hover { background: rgba(255, 255, 255, .16); }
+.lp-dark .lp-3d-card { background: #14224a; border-color: rgba(245, 197, 66, .4); color: #fff; box-shadow: 0 22px 50px -16px rgba(0, 0, 0, .7); }
+.lp-dark .lp-3d-due, .lp-dark .lp-3d-stage { color: #c7d0ee; border-color: rgba(255, 255, 255, .14); }
+.lp-gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.lp-scene.lp-gl-on .lp-3d { opacity: 0; }
+.lp-dark .lp-demo .wl-frame { border-color: rgba(245, 197, 66, .35); box-shadow: 0 -10px 80px -10px rgba(245, 197, 66, .22); }
+@media (prefers-reduced-motion: reduce) {
+  .lp-dark .lp-w { opacity: 1; transform: none; animation: none; }
+  .lp-dark .lp-mark::before { transform: none; animation: none; }
+  .lp-hero.lp-dark::before, .lp-dark .btn-primary { animation: none; }
+}
+.lp .lp-nav { background: rgba(8, 15, 38, .82); }
+.lp .lp-nav .lp-logo, .lp .lp-nav .lp-logo .brand-name, .lp .lp-links a { color: #fff; }
+.lp .lp-links a:hover { background: rgba(255, 255, 255, .1); }
+.lp .lp-nav-cta .btn:not(.btn-primary) { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .3); }
+.lp .lp-nav-cta .btn-primary { background: #f5c542; border-color: #f5c542; color: #0d1531; box-shadow: none; }
+.lp-dark .lp-scene { height: 400px; }
+@media (max-width: 700px) { .lp-dark .lp-scene { height: 300px; } }

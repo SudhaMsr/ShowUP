@@ -1,4 +1,5 @@
 // @ts-check
+import { mountHero3d } from './hero3d.js';
 import { passwordStrength } from '../app/crypto.js';
 import { FREE_ATTEMPTS } from '../app/auth.js';
 import { h, setChildren } from './dom.js';
@@ -93,6 +94,8 @@ export function showAuthScreen(root, auth, hooks) {
         });
         scene.addEventListener('pointerleave', () => { scene.style.setProperty('--px', '0'); scene.style.setProperty('--py', '0'); });
       }
+      // Upgrade to the WebGL scene once the page is idle; the CSS cards remain if it cannot start.
+      setTimeout(() => { mountHero3d(scene).catch(() => {}); }, 150);
       return scene;
     };
 
@@ -117,8 +120,11 @@ export function showAuthScreen(root, auth, hooks) {
           h('div', { class: 'lp-nav-cta' },
             returning ? h('button', { class: 'btn', type: 'button', id: 'lp-login', onclick: toForm }, 'Log in') : null,
             h('button', { class: 'btn btn-primary', type: 'button', onclick: toForm }, returning ? 'Open ShowUp' : 'Get ShowUp free'))));
-      const hero = h('section', { class: 'lp-hero', 'aria-labelledby': 'lp-title' },
-        h('h1', { id: 'lp-title', class: 'lp-title' }, 'Where students never miss an ', h('span', { class: 'wl-word' }, h('i'), 'opportunity'), ' again.'),
+      const hero = h('section', { class: 'lp-hero lp-dark', 'aria-labelledby': 'lp-title' },
+        h('h1', { id: 'lp-title', class: 'lp-title' },
+          ...['Where', 'students', 'never', 'miss', 'an'].flatMap((w) => [h('span', { class: 'lp-w' }, w), ' ']),
+          h('span', { class: 'lp-w lp-mark' }, 'opportunity'), ' ',
+          h('span', { class: 'lp-w' }, 'again.')),
         h('p', { class: 'lp-sub' }, 'Capture hackathons, internships and scholarships, track them to a result, and get reminded before the deadline.'),
         h('div', { class: 'lp-cta' },
           h('button', { class: 'btn btn-primary lp-btn', type: 'button', onclick: toForm }, returning ? `Log in${opts.name ? `, ${opts.name}` : ''}` : 'Get ShowUp free'),
