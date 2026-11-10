@@ -47,12 +47,8 @@ const stagger = (el, i) => {
 const icon = (d, size = 22) =>
   s('svg', { viewBox: '0 0 24 24', width: size, height: size, 'aria-hidden': 'true', fill: 'none', stroke: 'currentColor', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, s('path', { d }));
 
-/**
- * The first thing someone sees before they have added anything: what ShowUp is for,
- * a looping demo, and ways in. Everything animates in on scroll and respects reduced motion.
- * @param {ViewCtx} ctx
- */
-export function welcome(ctx) {
+/** The looping product demo in a window frame, with floating chips and a pointer tilt. */
+export function demoFrame() {
   const video = /** @type {HTMLVideoElement} */ (h('video', { class: 'wl-video', muted: true, loop: true, playsinline: true, preload: 'metadata', poster: 'media/hero-poster.png', 'aria-label': 'Demo: an opportunity moves from Found to Offer while a deadline reminder appears', tabindex: '-1' }, h('source', { src: 'media/hero.mp4', type: 'video/mp4' })));
   video.muted = true;
   if (!reducedMotion()) video.autoplay = true;
@@ -83,6 +79,22 @@ export function welcome(ctx) {
     });
     frame.addEventListener('pointerleave', () => ['--rx', '--ry', '--px', '--py'].forEach((p) => frame.style.removeProperty(p)));
   }
+  return frame;
+}
+
+/** Slow-scrolling strip of what you can track. */
+export function typeMarquee() {
+  const pills = [...TYPES, ...TYPES].map((t) => h('span', { class: 'wl-pill' }, t));
+  return h('section', { class: 'wl-marquee', 'aria-label': 'What you can track' }, h('div', { class: 'wl-track', 'aria-hidden': 'true' }, pills), h('p', { class: 'sr-only' }, TYPES.join(', ')));
+}
+
+/**
+ * The first thing someone sees before they have added anything: what ShowUp is for,
+ * a looping demo, and ways in. Everything animates in on scroll and respects reduced motion.
+ * @param {ViewCtx} ctx
+ */
+export function welcome(ctx) {
+  const frame = demoFrame();
 
   // Tabs
   const panel = h('div', { class: 'wl-panel', role: 'tabpanel', id: 'wl-panel', tabindex: '0' });
@@ -125,7 +137,7 @@ export function welcome(ctx) {
   const root = h('div', { class: 'welcome' },
     h('section', { class: 'wl-hero', 'aria-labelledby': 'wl-title' },
       h('p', { class: 'wl-eyebrow' }, 'For students and first-time applicants'),
-      h('h2', { id: 'wl-title', class: 'wl-title' }, 'Never miss the ', h('span', { class: 'wl-grad' }, 'opportunity'), ' that changes your year.'),
+      h('h2', { id: 'wl-title', class: 'wl-title' }, 'Never miss the ', h('span', { class: 'wl-word' }, h('i', null), 'opportunity'), ' that changes your year.'),
       h('p', { class: 'wl-sub' }, 'Hackathons, internships, scholarships and deadlines all in one calm place. Nothing here yet, so add your first one below.'),
       h('div', { class: 'row wl-cta' },
         h('button', { class: 'btn btn-primary wl-btn', type: 'button', onclick: () => ctx.add() }, 'Add an opportunity'),

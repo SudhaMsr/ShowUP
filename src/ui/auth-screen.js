@@ -2,7 +2,7 @@
 import { passwordStrength } from '../app/crypto.js';
 import { FREE_ATTEMPTS } from '../app/auth.js';
 import { h, setChildren } from './dom.js';
-import { startAurora } from './aurora.js';
+import { demoFrame, typeMarquee } from './welcome.js';
 
 /**
  * Full-screen create-account / sign-in. Resolves once the user is in.
@@ -21,7 +21,6 @@ export function showAuthScreen(root, auth, hooks) {
     const finish = (/** @type {Unlocked} */ u) => {
       root.classList.add('auth-leaving');
       const done = () => {
-        stopArt();
         root.hidden = true;
         root.classList.remove('auth-leaving');
         setChildren(root);
@@ -39,7 +38,6 @@ export function showAuthScreen(root, auth, hooks) {
 
     auth.getProfile().then((profile) => (profile ? signIn(profile) : signUp()));
 
-    let stopArt = () => {};
     // ---------- shared pieces ----------
     /** SVG needs the SVG namespace, which h() does not do; build the mark separately. */
     const mark = () => {
@@ -71,19 +69,58 @@ export function showAuthScreen(root, auth, hooks) {
       document.getElementById(id)?.setAttribute('aria-invalid', msg ? 'true' : 'false');
     };
 
-    const aside = (/** @type {string} */ title, /** @type {string} */ sub) =>
-      h('aside', { class: 'auth-art', 'aria-hidden': 'true' },
-        h('canvas', { id: 'auth-canvas', class: 'auth-canvas' }),
-        h('div', { class: 'auth-art-copy' },
-          h('p', { class: 'auth-art-title' }, title),
-          h('p', { class: 'auth-art-sub' }, sub)));
+    /** Notion-style front page shown before sign-up: nav, big headline, demo, then the form. */
+    const landing = (/** @type {HTMLElement} */ card) => {
+      const toForm = () => {
+        document.getElementById('start')?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+        setTimeout(() => /** @type {HTMLElement|null} */ (document.getElementById('auth-name'))?.focus({ preventScroll: true }), 350);
+      };
+      const nav = h('header', { class: 'lp-nav' },
+        h('div', { class: 'lp-nav-in' },
+          h('div', { class: 'lp-logo' }, mark(), h('span', { class: 'brand-name' }, 'ShowUp')),
+          h('nav', { class: 'lp-links', 'aria-label': 'Page' },
+            h('a', { href: '#how', onclick: (/** @type {Event} */ e) => { e.preventDefault(); document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' }); } }, 'How it works'),
+            h('a', { href: '#start', onclick: (/** @type {Event} */ e) => { e.preventDefault(); toForm(); } }, 'Privacy'),
+            h('a', { href: '#start', onclick: (/** @type {Event} */ e) => { e.preventDefault(); toForm(); } }, 'Get started')),
+          h('div', { class: 'lp-nav-cta' },
+            h('button', { class: 'btn btn-primary', type: 'button', onclick: toForm }, 'Get ShowUp free'))));
+      const hero = h('section', { class: 'lp-hero', 'aria-labelledby': 'lp-title' },
+        h('h1', { id: 'lp-title', class: 'lp-title' }, 'Where students never miss an ', h('span', { class: 'wl-word' }, h('i'), 'opportunity'), ' again.'),
+        h('p', { class: 'lp-sub' }, 'Capture hackathons, internships and scholarships, track them to a result, and get reminded before the deadline.'),
+        h('div', { class: 'lp-cta' },
+          h('button', { class: 'btn btn-primary lp-btn', type: 'button', onclick: toForm }, 'Get ShowUp free'),
+          h('button', { class: 'btn lp-btn lp-btn-soft', type: 'button', onclick: () => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' }) }, 'See how it works')),
+        h('div', { class: 'lp-demo', id: 'how' }, demoFrame()));
+      const how = h('section', { class: 'lp-three', 'aria-label': 'What ShowUp does' },
+        [['Capture', 'Paste text, say it, snap a screenshot or import a sheet. ShowUp fills in the details.'],
+         ['Track', 'Move each opportunity from Found to Applied to Offer, with a checklist and links.'],
+         ['Remember', 'Nudges 3 days and 1 day before a deadline, and silence once you have submitted.']].map(([t, d], i) =>
+          h('article', { class: 'lp-card', 'data-reveal': '' }, h('span', { class: 'lp-num' }, String(i + 1)), h('h3', null, t), h('p', null, d))));
+      const start = h('section', { class: 'lp-start', id: 'start', 'data-reveal': '' },
+        h('h2', null, 'Create your private space'),
+        h('p', { class: 'muted' }, 'Everything stays in your browser, encrypted with your password. No account, no tracking.'),
+        card);
+      const root2 = h('div', { class: 'lp' }, nav, hero, typeMarquee(), how, start,
+        h('footer', { class: 'lp-foot muted' }, 'ShowUp · local-first, open source'));
+      const targets = [...root2.querySelectorAll('[data-reveal]')];
+      if (!('IntersectionObserver' in window) || matchMedia('(prefers-reduced-motion: reduce)').matches) targets.forEach((t) => t.classList.add('in'));
+      else {
+        const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.15 });
+        requestAnimationFrame(() => targets.forEach((t) => io.observe(t)));
+      }
+      return root2;
+    };
 
-    /** @param {HTMLElement} card @param {string} title @param {string} sub */
-    const frame = (card, title, sub) => {
-      setChildren(root, h('div', { class: 'auth-shell' }, aside(title, sub), h('main', { class: 'auth-main', id: 'auth-main' }, card)));
-      stopArt();
-      const canvas = /** @type {HTMLCanvasElement|null} */ (root.querySelector('#auth-canvas'));
-      if (canvas) stopArt = startAurora(canvas);
+    /** @param {HTMLElement} card @param {string} title @param {string} sub @param {boolean} [front] show the full front page (new visitors only) */
+    const frame = (card, title, sub, front = false) => {
+      if (front) {
+        setChildren(root, landing(card));
+        root.scrollTop = 0;
+        return;
+      }
+      setChildren(root, h('div', { class: 'auth-simple' },
+        h('div', { class: 'auth-simple-top' }, mark(), h('span', { class: 'brand-name' }, 'ShowUp')),
+        h('main', { class: 'auth-main', id: 'auth-main' }, h('p', { class: 'sr-only' }, `${title} ${sub}`), card)));
       queueMicrotask(() => /** @type {HTMLElement|null} */ (root.querySelector('input:not([type=hidden])'))?.focus());
     };
 
@@ -107,7 +144,7 @@ export function showAuthScreen(root, auth, hooks) {
         h('p', { class: 'auth-error', id: 'auth-error', role: 'alert' }),
         h('button', { class: 'btn btn-primary btn-block', type: 'submit', id: 'auth-submit' }, 'Create account'),
         h('p', { class: 'auth-fine' }, 'There is no password reset by email, because there is no server. Export a backup now and then.'));
-      frame(form, 'Never miss the thing you signed up for.', 'Voice, screenshots and spreadsheets in. Calm reminders out.');
+      frame(form, 'Never miss the thing you signed up for.', 'Voice, screenshots and spreadsheets in. Calm reminders out.', true);
 
       const q = (/** @type {string} */ id) => /** @type {HTMLInputElement} */ (document.getElementById(id));
       q('auth-password').addEventListener('input', () => {
