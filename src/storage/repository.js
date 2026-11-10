@@ -5,6 +5,7 @@
  *   MemoryRepository    - tests, and graceful fallback (private mode / blocked storage)
  *
  * @typedef {import('../domain/event.js').ShowUpEvent} ShowUpEvent
+ * @typedef {import('../domain/page.js').Page} Page
  * @typedef {Object} Repository
  * @property {boolean} persistent
  * @property {() => Promise<ShowUpEvent[]>} all
@@ -13,13 +14,17 @@
  * @property {(list: ShowUpEvent[]) => Promise<void>} putMany
  * @property {(id: string) => Promise<void>} delete
  * @property {() => Promise<void>} clearEvents
+ * @property {() => Promise<Page[]>} allPages
+ * @property {(p: Page) => Promise<void>} putPage
+ * @property {(id: string) => Promise<void>} deletePage
+ * @property {() => Promise<void>} clearPages
  * @property {(key: string) => Promise<unknown>} getMeta
  * @property {(key: string, value: unknown) => Promise<void>} setMeta
  * @property {(key: string) => Promise<void>} deleteMeta
  */
 
 export const DB_NAME = 'showup';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 /** @implements {Repository} */
 export class MemoryRepository {
@@ -29,6 +34,22 @@ export class MemoryRepository {
     this.events = new Map();
     /** @type {Map<string, unknown>} */
     this.meta = new Map();
+    /** @type {Map<string, Page>} */
+    this.pages = new Map();
+  }
+  async allPages() {
+    return [...this.pages.values()].map((p) => structuredClone(p));
+  }
+  /** @param {Page} p */
+  async putPage(p) {
+    this.pages.set(p.id, structuredClone(p));
+  }
+  /** @param {string} id */
+  async deletePage(id) {
+    this.pages.delete(id);
+  }
+  async clearPages() {
+    this.pages.clear();
   }
   async all() {
     return [...this.events.values()].map((e) => structuredClone(e));
@@ -124,6 +145,7 @@ export class IndexedDbRepository {
           store.createIndex('status', 'status');
         }
         if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+        if (!db.objectStoreNames.contains('pages')) db.createObjectStore('pages', { keyPath: 'id' });
       };
       req.onsuccess = () => {
         const db = req.result;
@@ -194,6 +216,44 @@ export class IndexedDbRepository {
   }
   async clearEvents() {
     const { tx, os } = this.#tx('events', 'readwrite');
+    os.clear();
+    await done(tx);
+  }
+  /** Pages are always stored sealed when a codec is present. @param {Page} p */
+  async #packPage(p) {
+    return this.codec ? { id: p.id, ...(await this.codec.encode(`pages:${p.id}`, p)) } : p;
+  }
+  /** @param {any} rec @returns {Promise<Page|undefined>} */
+  async #unpackPage(rec) {
+    if (!sealedShape(rec)) return /** @type {Page} */ (rec);
+    if (!this.codec) return undefined;
+    try {
+      return /** @type {Page} */ (await this.codec.decode(`pages:${rec.id}`, rec));
+    } catch {
+      this.unreadable++;
+      return undefined;
+    }
+  }
+  async allPages() {
+    const { os } = this.#tx('pages', 'readonly');
+    const rows = /** @type {any[]} */ (await wrap(os.getAll()));
+    return /** @type {Page[]} */ ((await Promise.all(rows.map((r) => this.#unpackPage(r)))).filter(Boolean));
+  }
+  /** @param {Page} p */
+  async putPage(p) {
+    const row = await this.#packPage(p);
+    const { tx, os } = this.#tx('pages', 'readwrite');
+    os.put(row);
+    await done(tx);
+  }
+  /** @param {string} id */
+  async deletePage(id) {
+    const { tx, os } = this.#tx('pages', 'readwrite');
+    os.delete(id);
+    await done(tx);
+  }
+  async clearPages() {
+    const { tx, os } = this.#tx('pages', 'readwrite');
     os.clear();
     await done(tx);
   }
