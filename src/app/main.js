@@ -28,6 +28,7 @@ import { renderBoard } from '../ui/views/board.js';
 import { renderCalendar } from '../ui/views/calendar.js';
 import { renderCapture } from '../ui/views/capture.js';
 import { renderSettings } from '../ui/views/settings.js';
+import { renderPage, renderPages } from '../ui/views/pages.js';
 import { time12 } from '../ui/format.js';
 import { effectiveStatus, isApplicationType, isOpen, stageLabel } from '../domain/opportunity.js';
 
@@ -38,6 +39,8 @@ const ROUTES = /** @type {Record<string, { title: string, render: (ctx: any) => 
   '#/board': { title: 'Board', render: renderBoard },
   '#/insights': { title: 'Insights', render: renderInsights },
   '#/inbox': { title: 'Approvals', render: renderInbox },
+  '#/pages': { title: 'Pages', render: renderPages },
+  '#/page': { title: 'Page', render: renderPage },
   '#/capture': { title: 'Capture', render: renderCapture },
   '#/settings': { title: 'Settings', render: renderSettings },
 });
@@ -147,6 +150,15 @@ async function run(repo, account) {
     get now() {
       return new Date();
     },
+    /** The id in #/page/<id>, when that page is open. */
+    get pageId() {
+      if (!location.hash.startsWith('#/page/')) return undefined;
+      try {
+        return decodeURIComponent(location.hash.slice('#/page/'.length));
+      } catch {
+        return undefined;
+      }
+    },
     add: () => openEditor(store, null),
     /** @param {string} route */
     goto: (route) => {
@@ -155,21 +167,22 @@ async function run(repo, account) {
   };
 
   function currentRoute() {
-    return ROUTES[location.hash] ? location.hash : '#/today';
+    const base = location.hash.startsWith('#/page/') ? '#/page' : location.hash;
+    return ROUTES[base] ? base : '#/today';
   }
 
   function paint(moveFocus = false) {
     const route = currentRoute();
     const def = ROUTES[route];
     for (const a of document.querySelectorAll('nav a')) {
-      const on = a.getAttribute('href') === route;
+      const on = a.getAttribute('href') === (route === '#/page' ? '#/pages' : route);
       a.classList.toggle('active', on);
       if (on) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     }
     document.title = `${def.title} · ShowUp`;
     view.classList.remove('welcome-page');
-    setChildren(view, h('h1', { class: 'page-title', id: 'page-title' }, def.title), def.render(ctx));
+    setChildren(view, h('h1', { class: route === '#/page' ? 'page-title sr-only' : 'page-title', id: 'page-title' }, def.title), def.render(ctx));
     if (moveFocus) view.focus({ preventScroll: true });
   }
 
@@ -179,8 +192,9 @@ async function run(repo, account) {
     ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName ?? '') ||
     document.querySelector('details.more[open]') !== null;
 
+  // The page editor keeps its own draft and saves as you type, so it must not be repainted by its own saves.
   store.subscribe(() => {
-    if (!document.querySelector('dialog[open]')) paint();
+    if (currentRoute() !== '#/page' && !document.querySelector('dialog[open]')) paint();
   });
   // Saves happen while a dialog is still open, so repaint once it closes.
   // (`close` does not bubble, hence the capture phase.)
@@ -324,7 +338,7 @@ async function run(repo, account) {
   });
   // Keep countdowns fresh without disturbing editing.
   setInterval(() => {
-    if (document.visibilityState === 'visible' && !busy() && currentRoute() !== '#/capture' && currentRoute() !== '#/insights') paint();
+    if (document.visibilityState === 'visible' && !busy() && currentRoute() !== '#/capture' && currentRoute() !== '#/insights' && currentRoute() !== '#/page') paint();
   }, 60_000);
 
   if (!repo.persistent) {
@@ -344,10 +358,12 @@ async function run(repo, account) {
     const go = (/** @type {string} */ r, /** @type {string} */ label) => ({ id: `go${r}`, label: `Go to ${label}`, hint: 'Navigate', run: () => ctx.goto(r) });
     const cmds = [
       { id: 'add', label: 'Add event', hint: 'Create', run: () => ctx.add() },
-      go('#/today', 'Today'), go('#/upcoming', 'Upcoming'), go('#/calendar', 'Calendar'), go('#/board', 'Board'), go('#/inbox', 'Approvals'), go('#/insights', 'Insights'), go('#/capture', 'Capture & upload'), go('#/settings', 'Settings'),
+      { id: 'newpage', label: 'New blank page', hint: 'Create', run: async () => { const p = await store.createPage('blank'); if (p) ctx.goto(`#/page/${p.id}`); } },
+      go('#/today', 'Today'), go('#/upcoming', 'Upcoming'), go('#/calendar', 'Calendar'), go('#/board', 'Board'), go('#/pages', 'Pages'), go('#/inbox', 'Approvals'), go('#/insights', 'Insights'), go('#/capture', 'Capture & upload'), go('#/settings', 'Settings'),
       { id: 'theme', label: 'Toggle light / dark theme', hint: 'Appearance', run: () => toggleTheme() },
     ];
     if (account) cmds.push({ id: 'lock', label: 'Lock ShowUp', hint: 'Security', run: () => account.lock() });
+    for (const p of store.getState().pages.slice(0, 300)) cmds.push({ id: `page-${p.id}`, label: p.title, hint: 'Page', run: () => ctx.goto(`#/page/${p.id}`) });
     for (const e of store.getState().events.slice(0, 300)) cmds.push({ id: e.id, label: e.title, hint: `${e.date} · ${e.stage ? stageLabel(e.type, e.stage) : effectiveStatus(e)}`, run: () => openEditor(store, e) });
     return cmds;
   });

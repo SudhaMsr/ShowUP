@@ -412,7 +412,7 @@ test('stays responsive with 2,000 events', T, async () => {
   await open(page, server.url);
   await page.evaluate(async () => {
     const db = await new Promise((res, rej) => {
-      const r = indexedDB.open('showup', 1);
+      const r = indexedDB.open('showup');
       r.onsuccess = () => res(r.result);
       r.onerror = () => rej(r.error);
     });

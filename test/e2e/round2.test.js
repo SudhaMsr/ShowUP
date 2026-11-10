@@ -73,7 +73,10 @@ test('login: create account, data is encrypted at rest, lock, wrong password, un
   // Reload: not remembered, so the password is required.
   await page.reload();
   await page.waitForSelector('#auth-form');
-  assert.match(await page.textContent('h1'), /Welcome back, Sudha/);
+  // The front page comes first, even for a returning user, with the sign-in form below it.
+  assert.match(await page.textContent('h1'), /never miss an opportunity/);
+  assert.match(await page.textContent('#start h2'), /Welcome back, Sudha/);
+  assert.equal(await page.locator('#lp-login').count(), 1, 'nav has a Log in button');
   await page.fill('#auth-password', 'definitely-wrong');
   await page.click('#auth-submit');
   await expectText(page, '#auth-password-err', /not right/);

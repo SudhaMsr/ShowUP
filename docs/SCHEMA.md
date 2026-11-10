@@ -1,6 +1,6 @@
 # Data schema
 
-Storage: IndexedDB database `showup`, version 1.
+Storage: IndexedDB database `showup`, version 2 (version 2 adds the `pages` store; existing data is untouched).
 
 ## Object store `events` (keyPath `id`)
 
@@ -75,3 +75,22 @@ Older backups load unchanged; missing fields get defaults.
 
 `effectiveStatus(e)` maps a stage onto attendance (submitted counts as showing up, dropped as cancelled) so
 existing statistics keep working. CSV export gained `Stage` and `Deadline` as the last two columns.
+
+
+## Pages (version 2)
+
+Object store `pages`, key `id`. Each record is a note made of blocks, sealed with the same device key as events.
+
+```json
+{
+  "id": "string (letters, digits, - and _)",
+  "title": "string, 1 to 120 characters",
+  "icon": "string, up to 4 characters, may be empty",
+  "template": "template id or empty",
+  "createdAt": "ISO timestamp",
+  "updatedAt": "ISO timestamp",
+  "blocks": [{ "id": "string", "type": "text|h1|h2|todo|bullet|quote|divider", "text": "up to 2000 characters", "done": false }]
+}
+```
+
+Limits: 500 blocks per page, 5000 pages. Links between pages are written `[[Page title]]` in a block and matched by title, ignoring case; backlinks are computed, not stored. "Delete all events" in Settings does not delete pages.

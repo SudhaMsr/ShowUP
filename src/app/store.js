@@ -2,12 +2,14 @@
 import { normalizeEvent, validate } from '../domain/event.js';
 import { appendStageLog, hasPipeline, isApplicationType } from '../domain/opportunity.js';
 import { DEFAULT_REMINDER_SETTINGS } from '../domain/reminders.js';
+import { normalizePage, pageFromTemplate, validatePage, PAGE_LIMITS } from '../domain/page.js';
 
 /**
  * @typedef {import('../domain/event.js').ShowUpEvent} ShowUpEvent
  * @typedef {import('../storage/repository.js').Repository} Repository
  * @typedef {{ reminderOffsets: number[], allDayReminderHour: number, notifications: boolean, aiModel: string }} Settings
- * @typedef {{ events: ShowUpEvent[], settings: Settings, ready: boolean, persistent: boolean }} State
+ * @typedef {import('../domain/page.js').Page} Page
+ * @typedef {{ events: ShowUpEvent[], pages: Page[], settings: Settings, ready: boolean, persistent: boolean }} State
  */
 
 /** @type {Settings} */
@@ -43,7 +45,7 @@ export function sanitizeSettings(raw) {
 export function createStore(repo, opts = {}) {
   const clock = opts.now ?? (() => new Date());
   /** @type {State} */
-  let state = { events: [], settings: { ...DEFAULT_SETTINGS }, ready: false, persistent: repo.persistent };
+  let state = { events: [], pages: [], settings: { ...DEFAULT_SETTINGS }, ready: false, persistent: repo.persistent };
   /** @type {Set<(s: State) => void>} */
   const listeners = new Set();
 
@@ -62,9 +64,10 @@ export function createStore(repo, opts = {}) {
       return () => listeners.delete(fn);
     },
     async init() {
-      const [events, rawSettings] = await Promise.all([repo.all(), repo.getMeta('settings')]);
+      const [events, pages, rawSettings] = await Promise.all([repo.all(), repo.allPages(), repo.getMeta('settings')]);
       set({
         events: events.map((e) => normalizeEvent(/** @type {Record<string, unknown>} */ (e))),
+        pages: pages.map((p) => normalizePage(/** @type {Record<string, unknown>} */ (p))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
         settings: sanitizeSettings(rawSettings),
         ready: true,
       });
@@ -145,6 +148,38 @@ export function createStore(repo, opts = {}) {
       const e = state.events.find((x) => x.id === id);
       if (!e || !e.tasks[index]) return { ok: /** @type {const} */ (false), errors: { tasks: 'That task no longer exists.' } };
       return this.save({ id, tasks: e.tasks.map((t, i) => (i === index ? { ...t, done } : t)) });
+    },
+
+    /**
+     * Create or update a page. Returns validation errors instead of throwing.
+     * @param {Record<string, unknown>} input
+     * @returns {Promise<{ ok: true, page: Page } | { ok: false, errors: Record<string,string> }>}
+     */
+    async savePage(input) {
+      const existing = typeof input.id === 'string' ? state.pages.find((p) => p.id === input.id) : undefined;
+      if (!existing && state.pages.length >= PAGE_LIMITS.pages) return { ok: false, errors: { title: 'You have reached the page limit.' } };
+      const now = clock();
+      const page = normalizePage({ ...existing, ...input, createdAt: existing?.createdAt, updatedAt: now.toISOString() }, { now });
+      const v = validatePage(page);
+      if (!v.ok) return { ok: false, errors: v.errors };
+      await repo.putPage(page);
+      const rest = state.pages.filter((p) => p.id !== page.id);
+      set({ pages: [page, ...rest] });
+      return { ok: true, page };
+    },
+
+    /** @param {string} templateId @returns {Promise<Page|null>} */
+    async createPage(templateId) {
+      const page = pageFromTemplate(templateId, { now: clock() });
+      if (!page) return null;
+      const res = await this.savePage(page);
+      return res.ok ? res.page : null;
+    },
+
+    /** @param {string} id */
+    async removePage(id) {
+      await repo.deletePage(id);
+      set({ pages: state.pages.filter((p) => p.id !== id) });
     },
 
     /** @param {string} id */

@@ -80,3 +80,13 @@ MIT
 * Optional: `server/` is a zero-dependency relay that pushes reminders to ntfy, Telegram, email, a webhook or
   Web Push while the app is closed. See `server/README.md`. Build the page with `SHOWUP_RELAY_ORIGINS` set to allow it.
 * `python3 scripts/make-hero-video.py` regenerates the welcome-screen demo (needs Pillow and ffmpeg).
+
+## Pages, templates and the sidebar (phase 2)
+
+- **Front page first.** Everyone sees the front page before signing in, including returning users, who get a Log in button and the unlock form below it. The hero has floating deadline cards in plain CSS 3D (they tilt toward the pointer, and stop moving when reduced motion is on).
+- **Pages.** Notes made of blocks (text, headings, to-dos, bullets, quotes, dividers). Typing saves automatically, encrypted like events. A to-do count shows progress. Link pages with `[[Page title]]`; each page lists what links to it. Export a page as Markdown, or import a Markdown file.
+- **Templates.** Internship hunt, scholarship season, hackathon team kit, exam revision plan, and a blank page.
+- **Search.** Ctrl or Cmd + K finds pages as well as events; the Pages view searches page text.
+- **Sidebar.** On screens 1000px and wider the navigation is a left sidebar; on narrower screens it stays along the top.
+
+Not in this phase: Postgres in the browser, Three.js or GSAP scenes, cross-device sync, AI, and shared pages. Package installs were not available while building, so everything here uses no new dependencies.
