@@ -69,11 +69,16 @@ export function showAuthScreen(root, auth, hooks) {
       document.getElementById(id)?.setAttribute('aria-invalid', msg ? 'true' : 'false');
     };
 
-    /** Notion-style front page shown before sign-up: nav, big headline, demo, then the form. */
-    const landing = (/** @type {HTMLElement} */ card) => {
+    /**
+     * Notion-style front page shown before every sign-in or sign-up: nav, big headline, demo, then the form.
+     * @param {HTMLElement} card
+     * @param {{ returning?: boolean, name?: string }} [opts]
+     */
+    const landing = (card, opts = {}) => {
+      const returning = Boolean(opts.returning);
       const toForm = () => {
         document.getElementById('start')?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
-        setTimeout(() => /** @type {HTMLElement|null} */ (document.getElementById('auth-name'))?.focus({ preventScroll: true }), 350);
+        setTimeout(() => /** @type {HTMLElement|null} */ (document.getElementById(returning ? 'auth-password' : 'auth-name'))?.focus({ preventScroll: true }), 350);
       };
       const nav = h('header', { class: 'lp-nav' },
         h('div', { class: 'lp-nav-in' },
@@ -81,14 +86,15 @@ export function showAuthScreen(root, auth, hooks) {
           h('nav', { class: 'lp-links', 'aria-label': 'Page' },
             h('a', { href: '#how', onclick: (/** @type {Event} */ e) => { e.preventDefault(); document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' }); } }, 'How it works'),
             h('a', { href: '#start', onclick: (/** @type {Event} */ e) => { e.preventDefault(); toForm(); } }, 'Privacy'),
-            h('a', { href: '#start', onclick: (/** @type {Event} */ e) => { e.preventDefault(); toForm(); } }, 'Get started')),
+            h('a', { href: '#start', onclick: (/** @type {Event} */ e) => { e.preventDefault(); toForm(); } }, returning ? 'Log in' : 'Get started')),
           h('div', { class: 'lp-nav-cta' },
-            h('button', { class: 'btn btn-primary', type: 'button', onclick: toForm }, 'Get ShowUp free'))));
+            returning ? h('button', { class: 'btn', type: 'button', id: 'lp-login', onclick: toForm }, 'Log in') : null,
+            h('button', { class: 'btn btn-primary', type: 'button', onclick: toForm }, returning ? 'Open ShowUp' : 'Get ShowUp free'))));
       const hero = h('section', { class: 'lp-hero', 'aria-labelledby': 'lp-title' },
         h('h1', { id: 'lp-title', class: 'lp-title' }, 'Where students never miss an ', h('span', { class: 'wl-word' }, h('i'), 'opportunity'), ' again.'),
         h('p', { class: 'lp-sub' }, 'Capture hackathons, internships and scholarships, track them to a result, and get reminded before the deadline.'),
         h('div', { class: 'lp-cta' },
-          h('button', { class: 'btn btn-primary lp-btn', type: 'button', onclick: toForm }, 'Get ShowUp free'),
+          h('button', { class: 'btn btn-primary lp-btn', type: 'button', onclick: toForm }, returning ? `Log in${opts.name ? `, ${opts.name}` : ''}` : 'Get ShowUp free'),
           h('button', { class: 'btn lp-btn lp-btn-soft', type: 'button', onclick: () => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' }) }, 'See how it works')),
         h('div', { class: 'lp-demo', id: 'how' }, demoFrame()));
       const how = h('section', { class: 'lp-three', 'aria-label': 'What ShowUp does' },
@@ -97,8 +103,8 @@ export function showAuthScreen(root, auth, hooks) {
          ['Remember', 'Nudges 3 days and 1 day before a deadline, and silence once you have submitted.']].map(([t, d], i) =>
           h('article', { class: 'lp-card', 'data-reveal': '' }, h('span', { class: 'lp-num' }, String(i + 1)), h('h3', null, t), h('p', null, d))));
       const start = h('section', { class: 'lp-start', id: 'start', 'data-reveal': '' },
-        h('h2', null, 'Create your private space'),
-        h('p', { class: 'muted' }, 'Everything stays in your browser, encrypted with your password. No account, no tracking.'),
+        h('h2', null, returning ? `Welcome back${opts.name ? `, ${opts.name}` : ''}` : 'Create your private space'),
+        h('p', { class: 'muted' }, returning ? 'Enter your password to unlock your events.' : 'Everything stays in your browser, encrypted with your password. No account, no tracking.'),
         card);
       const root2 = h('div', { class: 'lp' }, nav, hero, typeMarquee(), how, start,
         h('footer', { class: 'lp-foot muted' }, 'ShowUp · local-first, open source'));
@@ -111,10 +117,10 @@ export function showAuthScreen(root, auth, hooks) {
       return root2;
     };
 
-    /** @param {HTMLElement} card @param {string} title @param {string} sub @param {boolean} [front] show the full front page (new visitors only) */
-    const frame = (card, title, sub, front = false) => {
+    /** @param {HTMLElement} card @param {string} title @param {string} sub @param {boolean} [front] show the full front page @param {{ returning?: boolean, name?: string }} [opts] */
+    const frame = (card, title, sub, front = false, opts = {}) => {
       if (front) {
-        setChildren(root, landing(card));
+        setChildren(root, landing(card, opts));
         root.scrollTop = 0;
         return;
       }
@@ -188,7 +194,7 @@ export function showAuthScreen(root, auth, hooks) {
         h('p', { class: 'auth-error', id: 'auth-error', role: 'alert' }),
         h('button', { class: 'btn btn-primary btn-block', type: 'submit', id: 'auth-submit' }, 'Unlock'),
         h('button', { class: 'linklike', type: 'button', id: 'auth-forgot' }, 'Forgot your password?'));
-      frame(form, 'Your events are safe here.', 'Encrypted on this device. Only your password opens them.');
+      frame(form, 'Your events are safe here.', 'Encrypted on this device. Only your password opens them.', true, { returning: true, name: first });
 
       const q = (/** @type {string} */ id) => /** @type {HTMLInputElement} */ (document.getElementById(id));
       const errEl = () => /** @type {HTMLElement} */ (document.getElementById('auth-error'));
